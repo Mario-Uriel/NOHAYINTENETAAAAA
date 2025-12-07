@@ -11,7 +11,7 @@
 const int WIDTH = BLOCKS * blockSize;
 const int HEIGHT = BLOCKS * blockSize;
 
-sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Snake");
+sf::RenderWindow window(sf::VideoMode({WIDTH, HEIGHT}), "Snake");
 
 bool gameOver = false;
 
@@ -119,17 +119,17 @@ public:
     {
         if(!useWASD)
         {
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up) && dir.y!=1)     dir = {0, -1};
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Down) && dir.y!=-1)  dir = {0, 1};
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Left) && dir.x!=1)   dir = {-1, 0};
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right) && dir.x!=-1) dir = {1, 0};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) && dir.y!=1)     dir = {0, -1};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) && dir.y!=-1)  dir = {0, 1};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) && dir.x!=1)   dir = {-1, 0};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) && dir.x!=-1) dir = {1, 0};
         }
         else
         {
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::W) && dir.y!=1)  dir = {0, -1};
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::S) && dir.y!=-1) dir = {0, 1};
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::A) && dir.x!=1)  dir = {-1, 0};
-            if(sf::Keyboard::isKeyPressed(sf::Keyboard::D) && dir.x!=-1) dir = {1, 0};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W) && dir.y!=1)  dir = {0, -1};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) && dir.y!=-1) dir = {0, 1};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A) && dir.x!=1)  dir = {-1, 0};
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) && dir.x!=-1) dir = {1, 0};
         }
     }
 
@@ -176,10 +176,9 @@ int main()
 
     while(window.isOpen())
     {
-        sf::Event e;
-        while(window.pollEvent(e)){
-            if(e.type == sf::Event::Closed) window.close();
-            if(gameOver && sf::Keyboard::isKeyPressed(sf::Keyboard::R)) main();
+        while(const auto e = window.pollEvent()){
+            if(e->is<sf::Event::Closed>()) window.close();
+            if(gameOver && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R)) main();
         }
 
         sf::Time time = clock.restart();

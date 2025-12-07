@@ -3,7 +3,7 @@
 
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Reproductor de musica");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "Reproductor de musica");
 
     sf::Music music;
     if (!music.openFromFile("./assets/music/musica.ogg"))
@@ -17,10 +17,9 @@ int main()
 
     while (window.isOpen())
     {
-        sf::Event event;
-        while (window.pollEvent(event))
+        while (const auto event = window.pollEvent())
         {
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
             {
                 window.close();
             }
@@ -31,7 +30,7 @@ int main()
         window.display();
 
         // Esperar hasta que la música termine
-        if (music.getStatus() != sf::Music::Playing)
+        if (music.getStatus() != sf::SoundSource::Status::Playing)
         {
             window.close();
         }

@@ -3,7 +3,7 @@
 int main()
 {
     // Crear una ventana
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Sprite Animado");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "Sprite Animado");
 
     // Cargar la imagen desde un archivo
     sf::Texture texture;
@@ -15,7 +15,7 @@ int main()
 
     // Crear un sprite y asignarle la textura
     sf::Sprite sprite(texture);
-    sprite.setPosition(400, 300);
+    sprite.setPosition(sf::Vector2f(400, 300));
 
     sf::Clock clock;
     float frameTime = 0.1f; // Tiempo entre cada frame en segundos
@@ -27,10 +27,9 @@ int main()
     while (window.isOpen())
     {
         // Procesar eventos
-        sf::Event event;
-        while (window.pollEvent(event))
+        while (const auto event = window.pollEvent())
         {
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
             {
                 window.close();
             }
@@ -40,7 +39,7 @@ int main()
         if (clock.getElapsedTime().asSeconds() >= frameTime)
         {
             currentFrame = (currentFrame + 1) % numFrames;
-            sprite.setTextureRect(sf::IntRect((currentFrame * 64)+17, 133, 64, 36));
+            sprite.setTextureRect(sf::IntRect(sf::Vector2i((currentFrame * 64)+17, 133), sf::Vector2i(64, 36)));
             clock.restart();
         }
 

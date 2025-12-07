@@ -3,7 +3,7 @@
 int main()
 {
     // Crear una ventana
-    sf::RenderWindow window(sf::VideoMode(800, 600), "SFML Image");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "SFML Image");
 
     // Cargar la imagen desde un archivo
     sf::Texture texture;
@@ -20,10 +20,9 @@ int main()
     while (window.isOpen())
     {
         // Procesar eventos
-        sf::Event event;
-        while (window.pollEvent(event))
+        while (const auto event = window.pollEvent())
         {
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
             {
                 // Cerrar la ventana si se recibe el evento de cerrar
                 window.close();

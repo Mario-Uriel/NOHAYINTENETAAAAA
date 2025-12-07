@@ -3,11 +3,11 @@
 int main()
 {
     // Crear una ventana
-    sf::RenderWindow window(sf::VideoMode(800, 600), "SFML Texto");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "SFML Texto");
 
     // Cargar la fuente de texto TTF
     sf::Font font;
-    if (!font.loadFromFile("./assets/fonts/Minecraft.ttf"))
+    if (!font.openFromFile("./assets/fonts/Minecraft.ttf"))
     {
         // Manejar el error si no se puede cargar la fuente
         return -1;
@@ -15,32 +15,29 @@ int main()
 
     // Cargar una fuente de texto
     sf::Font font2;
-    if (!font2.loadFromFile("./assets/fonts/Ring.ttf"))
+    if (!font2.openFromFile("./assets/fonts/Ring.ttf"))
     {
         // Manejar el error si no se puede cargar la fuente
         return -1;
     }
 
     // Crear un objeto de texto
-    sf::Text text;
-    text.setFont(font);
+    sf::Text text(font);
     text.setString("Ejemplo texto Minecraft!");
     text.setCharacterSize(29);
     text.setFillColor(sf::Color::White);
 
     // Crear un objeto de texto LOTR
-    sf::Text text2;
-    text2.setFont(font2);
+    sf::Text text2(font2);
     text2.setString("Ejemplo texto LOTR");
     text2.setCharacterSize(40);
-    text2.setPosition(100, 100);
+    text2.setPosition(sf::Vector2f(100, 100));
 
     while (window.isOpen())
     {
-        sf::Event event;
-        while (window.pollEvent(event))
+        while (const auto event = window.pollEvent())
         {
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
             {
                 window.close();
             }

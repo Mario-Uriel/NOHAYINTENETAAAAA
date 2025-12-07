@@ -3,7 +3,7 @@
 class Personaje
 {
 public:
-    Personaje(sf::Vector2f position, sf::Color color)
+    Personaje(sf::Vector2f position, sf::Color color) : sprite(texture)
     {
         shape.setSize(sf::Vector2f(50, 50));
         shape.setPosition(position); // Posición inicial cuadro
@@ -15,14 +15,14 @@ public:
         {
         
         }
-        this->sprite = sf::Sprite(texture);
+        this->sprite.setTexture(texture);
         this->sprite.setPosition(position); // Posición inicial sprite
     }
 
     void move(float offsetX, float offsetY)
     {
-        sprite.move(offsetX, offsetY);
-        shape.move(offsetX, offsetY);
+        sprite.move(sf::Vector2f(offsetX, offsetY));
+        shape.move(sf::Vector2f(offsetX, offsetY));
     }
 
     void draw(sf::RenderWindow &window)
@@ -36,7 +36,7 @@ public:
         if (clock.getElapsedTime().asSeconds() >= frameTime)
         {
             currentFrame = (currentFrame + 1) % numFrames;
-            sprite.setTextureRect(sf::IntRect((currentFrame * 64)+17, 133, 64, 36));
+            sprite.setTextureRect(sf::IntRect(sf::Vector2i((currentFrame * 64)+17, 133), sf::Vector2i(64, 36)));
             clock.restart();
         }
     }
@@ -57,34 +57,33 @@ double velocidad = 0.1;
 
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(800, 600), "DinoChrome");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "DinoChrome");
 
     Personaje pika(sf::Vector2f(400, 300), sf::Color::Red);
 
     while (window.isOpen())
     {
-        sf::Event event;
-        while (window.pollEvent(event))
+        while (const auto event = window.pollEvent())
         {
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
             {
                 window.close();
             }
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
         {
             pika.move(velocidad * -1, 0);
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
         {
             pika.move(velocidad, 0);
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
         {
             pika.move(0, velocidad * -1);
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
         {
             pika.move(0, velocidad);
         }

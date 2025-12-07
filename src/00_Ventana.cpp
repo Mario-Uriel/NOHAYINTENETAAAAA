@@ -3,7 +3,7 @@
 int main()
 {
     // Crear una ventana de SFML
-    sf::RenderWindow window(sf::VideoMode(200, 200), "SFML works!");
+    sf::RenderWindow window(sf::VideoMode({200, 200}), "SFML works!");
 
     // Crear una forma circular de SFML
     sf::CircleShape shape(100.f);
@@ -11,11 +11,11 @@ int main()
 
     while (window.isOpen())
     {
-        sf::Event event;
-        while (window.pollEvent(event))
+        // Procesar eventos
+        while (const auto event = window.pollEvent())
         {
             // Verificar si se ha cerrado la ventana
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
                 window.close();
         }
 
