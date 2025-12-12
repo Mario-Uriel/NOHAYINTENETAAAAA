@@ -3,11 +3,11 @@
 int main()
 {
     // Crear una ventana
-    sf::RenderWindow window(sf::VideoMode({800, 600}), "PIKA Sprite Animado");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "Camioneta Sprite Animado");
 
-    // Cargar la imagen PIKACHU (2) (1) desde un archivo
+    // Cargar la imagen Camioneta FINAL desde un archivo
     sf::Texture texture;
-    if (!texture.loadFromFile("assets/images/PIKACHU (2) (1).png"))
+    if (!texture.loadFromFile("assets/images/Camioneta FINAL.png"))
     {
         // Manejo de error si no se puede cargar la imagen
         return -1;
@@ -19,22 +19,29 @@ int main()
     // Obtener el tamaño de la textura
     sf::Vector2u textureSize = texture.getSize();
     
+    // Calcular el ancho de cada frame (dividir la imagen en frames)
+    int numFrames = 3; // Número total de frames en la animación
+    int frameWidth = textureSize.x / numFrames;
+    int frameHeight = textureSize.y;
+    
+    // Configurar el rectángulo de textura para mostrar solo el primer frame
+    sprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(frameWidth, frameHeight)));
+    
     // Calcular escala para que quepa en pantalla (máximo 300px de altura)
-    float scale = 300.0f / textureSize.y;
+    float scale = 300.0f / frameHeight;
     if (scale > 1.0f) scale = 1.0f; // Limitar escala máxima
-    sprite.setScale(sf::Vector2f(scale, scale));
+    sprite.setScale(sf::Vector2f(scale, scale)); // Sin voltear para que mire a la derecha
     
     // Centrar en la ventana
-    float scaledWidth = textureSize.x * scale;
-    float scaledHeight = textureSize.y * scale;
+    float scaledWidth = frameWidth * scale;
+    float scaledHeight = frameHeight * scale;
     sprite.setPosition(sf::Vector2f((800 - scaledWidth) / 2, (600 - scaledHeight) / 2));
 
     sf::Clock clock;
-    float frameTime = 0.12f; // Tiempo entre cada frame (animación más lenta)
+    float frameTime = 0.12f; // Tiempo entre cada frame
     int currentFrame = 0;
-    int numFrames = 4; // Número total de frames en la animación
-    float posX = (800 - scaledWidth) / 2;
-    float speed = 100.0f; // Velocidad de movimiento más lenta
+    float posX = 800; // Empezar desde la derecha
+    float speed = -100.0f; // Velocidad negativa para moverse a la izquierda
 
     while (window.isOpen())
     {
@@ -49,13 +56,13 @@ int main()
 
         float deltaTime = clock.restart().asSeconds();
 
-        // Mover el sprite hacia la derecha
+        // Mover el sprite hacia la izquierda
         posX += speed * deltaTime;
         
-        // Si sale de la pantalla por la derecha, volver a aparecer por la izquierda
-        if (posX > 800)
+        // Si sale de la pantalla por la izquierda, volver a aparecer por la derecha
+        if (posX < -scaledWidth)
         {
-            posX = -scaledWidth;
+            posX = 800;
         }
         
         sprite.setPosition(sf::Vector2f(posX, (600 - scaledHeight) / 2));
@@ -66,9 +73,8 @@ int main()
         if (animTimer >= frameTime)
         {
             currentFrame = (currentFrame + 1) % numFrames;
-            // Animar usando frames horizontales de la imagen
-            int frameWidth = textureSize.x / numFrames;
-            sprite.setTextureRect(sf::IntRect(sf::Vector2i(currentFrame * frameWidth, 0), sf::Vector2i(frameWidth, textureSize.y)));
+            // Actualizar el rectángulo de textura para mostrar el frame actual (desplazado -10 píxeles)
+            sprite.setTextureRect(sf::IntRect(sf::Vector2i((currentFrame * frameWidth) - 10, 0), sf::Vector2i(frameWidth, frameHeight)));
             animTimer = 0.0f;
         }
 

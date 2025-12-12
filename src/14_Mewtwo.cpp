@@ -3,11 +3,11 @@
 int main()
 {
     // Crear una ventana
-    sf::RenderWindow window(sf::VideoMode({800, 600}), "PIKA Sprite Animado");
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "Mewtwo Sprite Animado");
 
-    // Cargar la imagen PIKACHU (2) (1) desde un archivo
+    // Cargar la imagen Mewtwo desde un archivo
     sf::Texture texture;
-    if (!texture.loadFromFile("assets/images/PIKACHU (2) (1).png"))
+    if (!texture.loadFromFile("assets/images/Mewtwo (1).png"))
     {
         // Manejo de error si no se puede cargar la imagen
         return -1;
@@ -22,7 +22,7 @@ int main()
     // Calcular escala para que quepa en pantalla (máximo 300px de altura)
     float scale = 300.0f / textureSize.y;
     if (scale > 1.0f) scale = 1.0f; // Limitar escala máxima
-    sprite.setScale(sf::Vector2f(scale, scale));
+    sprite.setScale(sf::Vector2f(scale, scale)); // Sin voltear para que mire a la izquierda
     
     // Centrar en la ventana
     float scaledWidth = textureSize.x * scale;
@@ -33,8 +33,8 @@ int main()
     float frameTime = 0.12f; // Tiempo entre cada frame (animación más lenta)
     int currentFrame = 0;
     int numFrames = 4; // Número total de frames en la animación
-    float posX = (800 - scaledWidth) / 2;
-    float speed = 100.0f; // Velocidad de movimiento más lenta
+    float posX = 800; // Empezar desde la derecha
+    float speed = -100.0f; // Velocidad negativa para moverse a la izquierda
 
     while (window.isOpen())
     {
@@ -49,13 +49,13 @@ int main()
 
         float deltaTime = clock.restart().asSeconds();
 
-        // Mover el sprite hacia la derecha
+        // Mover el sprite hacia la izquierda
         posX += speed * deltaTime;
         
-        // Si sale de la pantalla por la derecha, volver a aparecer por la izquierda
-        if (posX > 800)
+        // Si sale de la pantalla por la izquierda, volver a aparecer por la derecha
+        if (posX < -scaledWidth)
         {
-            posX = -scaledWidth;
+            posX = 800;
         }
         
         sprite.setPosition(sf::Vector2f(posX, (600 - scaledHeight) / 2));
