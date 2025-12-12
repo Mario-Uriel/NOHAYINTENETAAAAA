@@ -62,16 +62,8 @@ public:
 
 class Dino {
 public:
-    sf::RectangleShape body;
-    sf::RectangleShape head;
-    sf::RectangleShape eye;
-    sf::RectangleShape arm;
-    sf::RectangleShape tail;
-    sf::RectangleShape leg1;
-    sf::RectangleShape leg2;
-    sf::RectangleShape mouth;
-    sf::RectangleShape teeth1;
-    sf::RectangleShape teeth2;
+    sf::Texture walkTexture;
+    sf::Sprite sprite;
     float velocityY;
     float x, y;
     bool isJumping;
@@ -80,61 +72,31 @@ public:
     int facingDirection; // 1 = derecha, -1 = izquierda
     sf::Clock animationClock;
     sf::Clock shootClock;
+    int numFrames;
+    float spriteScale;
 
-    Dino(float startX, float startY) {
+    Dino(float startX, float startY) : sprite(walkTexture) {
         x = startX;
         y = startY;
         facingDirection = 1;
+        numFrames = 4;
+        spriteScale = 0.6f; // Ajustado para estar al nivel de los cactus
         
-        // Cuerpo - más detallado
-        body.setSize(sf::Vector2f(60, 60));
-        body.setFillColor(sf::Color(180, 20, 20));
-        body.setOutlineColor(sf::Color(120, 10, 10));
-        body.setOutlineThickness(2);
-
-        // Cabeza
-        head.setSize(sf::Vector2f(45, 38));
-        head.setFillColor(sf::Color(180, 20, 20));
-        head.setOutlineColor(sf::Color(120, 10, 10));
-        head.setOutlineThickness(2);
-
-        // Ojo furioso
-        eye.setSize(sf::Vector2f(8, 8));
-        eye.setFillColor(sf::Color::Yellow);
-        eye.setOutlineColor(sf::Color::Red);
-        eye.setOutlineThickness(1);
-
-        // Boca
-        mouth.setSize(sf::Vector2f(20, 6));
-        mouth.setFillColor(sf::Color(50, 50, 50));
-
-        // Dientes
-        teeth1.setSize(sf::Vector2f(4, 8));
-        teeth1.setFillColor(sf::Color::White);
+        // Cargar textura
+        if (!walkTexture.loadFromFile("assets/images/PIKACHU (2) (1).png")) {
+            // Error al cargar textura
+        }
         
-        teeth2.setSize(sf::Vector2f(4, 8));
-        teeth2.setFillColor(sf::Color::White);
-
-        // Brazo
-        arm.setSize(sf::Vector2f(12, 32));
-        arm.setFillColor(sf::Color(180, 20, 20));
-
-        // Cola
-        tail.setSize(sf::Vector2f(25, 18));
-        tail.setFillColor(sf::Color(180, 20, 20));
-        tail.setOutlineColor(sf::Color(120, 10, 10));
-        tail.setOutlineThickness(2);
-
-        // Piernas más robustas
-        leg1.setSize(sf::Vector2f(16, 32));
-        leg1.setFillColor(sf::Color(180, 20, 20));
-        leg1.setOutlineColor(sf::Color(120, 10, 10));
-        leg1.setOutlineThickness(1);
-
-        leg2.setSize(sf::Vector2f(16, 32));
-        leg2.setFillColor(sf::Color(180, 20, 20));
-        leg2.setOutlineColor(sf::Color(120, 10, 10));
-        leg2.setOutlineThickness(1);
+        sprite.setTexture(walkTexture);
+        sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
+        
+        // Configurar el primer frame
+        sf::Vector2u texSize = walkTexture.getSize();
+        int frameWidth = texSize.x / numFrames;
+        sprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(frameWidth, texSize.y)));
+        
+        // Establecer origen en la base completa (100% abajo)
+        sprite.setOrigin(sf::Vector2f(frameWidth / 2.0f, texSize.y));
 
         velocityY = 0;
         isJumping = false;
@@ -170,7 +132,12 @@ public:
     void update(float groundY) {
         // Aplicar gravedad
         if (isJumping) {
-            velocityY += GRAVITY;
+            // Si está presionando abajo mientras salta, acelerar la caída
+            if (isDucking) {
+                velocityY += GRAVITY * 2.5f; // Acelerar caída
+            } else {
+                velocityY += GRAVITY;
+            }
             y += velocityY;
 
             // Verificar si tocó el suelo
@@ -181,59 +148,27 @@ public:
             }
         }
 
-        // Animación de piernas
-        if (animationClock.getElapsedTime().asSeconds() > 0.15f && !isJumping && !isDucking) {
-            animationFrame = (animationFrame + 1) % 2;
+        // Configurar sprite (siempre usa walkTexture)
+        sprite.setTexture(walkTexture);
+        sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
+        sf::Vector2u texSize = walkTexture.getSize();
+        int frameWidth = texSize.x / numFrames;
+        sprite.setOrigin(sf::Vector2f(frameWidth / 2.0f, texSize.y)); // Origen en la base 100%
+        
+        // Animación de frames
+        if (animationClock.getElapsedTime().asSeconds() > 0.12f && !isJumping) {
+            animationFrame = (animationFrame + 1) % numFrames;
+            sprite.setTextureRect(sf::IntRect(sf::Vector2i(animationFrame * frameWidth, 0), sf::Vector2i(frameWidth, texSize.y)));
             animationClock.restart();
         }
-
-        // Actualizar posiciones de las partes del cuerpo
-        body.setPosition(sf::Vector2f(x, y));
-
-        if (isDucking) {
-            // Posición agachado
-            head.setSize(sf::Vector2f(45, 30));
-            head.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 20 : -5), y + 25));
-            eye.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 52 : 5), y + 32));
-            mouth.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 50 : 0), y + 42));
-            teeth1.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 52 : 8), y + 38));
-            teeth2.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 60 : 12), y + 38));
-            arm.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 8 : 40), y + 40));
-            tail.setPosition(sf::Vector2f(x + (facingDirection == 1 ? -18 : 53), y + 30));
-            
-            leg1.setSize(sf::Vector2f(16, 20));
-            leg2.setSize(sf::Vector2f(16, 20));
-            leg1.setPosition(sf::Vector2f(x + 8, y + 60));
-            leg2.setPosition(sf::Vector2f(x + 36, y + 60));
-        } else {
-            // Posición normal
-            head.setSize(sf::Vector2f(45, 38));
-            head.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 20 : -5), y - 32));
-            eye.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 52 : 5), y - 22));
-            mouth.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 50 : 0), y - 10));
-            teeth1.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 52 : 8), y - 14));
-            teeth2.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 60 : 12), y - 14));
-            arm.setPosition(sf::Vector2f(x + (facingDirection == 1 ? 5 : 43), y + 15));
-            tail.setPosition(sf::Vector2f(x + (facingDirection == 1 ? -18 : 53), y + 20));
-
-            leg1.setSize(sf::Vector2f(16, 32));
-            leg2.setSize(sf::Vector2f(16, 32));
-
-            // Actualizar posición de piernas con animación
-            float legY = y + body.getSize().y;
-            if (isJumping) {
-                leg1.setPosition(sf::Vector2f(x + 8, legY));
-                leg2.setPosition(sf::Vector2f(x + 36, legY));
-            } else {
-                if (animationFrame == 0) {
-                    leg1.setPosition(sf::Vector2f(x + 8, legY));
-                    leg2.setPosition(sf::Vector2f(x + 36, legY - 6));
-                } else {
-                    leg1.setPosition(sf::Vector2f(x + 8, legY - 6));
-                    leg2.setPosition(sf::Vector2f(x + 36, legY));
-                }
-            }
+        
+        // Voltear sprite según dirección
+        if (facingDirection == -1) {
+            sprite.setScale(sf::Vector2f(-spriteScale, spriteScale));
         }
+        
+        // Actualizar posición del sprite
+        sprite.setPosition(sf::Vector2f(x, y));
     }
 
     bool canShoot() {
@@ -245,35 +180,28 @@ public:
     }
 
     void draw(sf::RenderWindow& window) {
-        window.draw(tail);
-        window.draw(body);
-        window.draw(leg1);
-        window.draw(leg2);
-        window.draw(arm);
-        window.draw(head);
-        window.draw(mouth);
-        window.draw(teeth1);
-        window.draw(teeth2);
-        window.draw(eye);
+        window.draw(sprite);
     }
 
     sf::FloatRect getBounds() const {
-        sf::FloatRect bounds;
-        if (isDucking) {
-            bounds.position = sf::Vector2f(x + 5, y + 20);
-            bounds.size = sf::Vector2f(50, 50);
-        } else {
-            bounds.position = sf::Vector2f(x + 5, y - 30);
-            bounds.size = sf::Vector2f(50, 85);
-        }
+        sf::FloatRect bounds = sprite.getGlobalBounds();
+        // Ajustar hitbox para ser más precisa (centrar en el personaje)
+        float newWidth = bounds.size.x * 0.6f;
+        float newHeight = bounds.size.y * 0.7f;
+        bounds.position.x += (bounds.size.x - newWidth) / 2.0f;
+        bounds.position.y += (bounds.size.y - newHeight) / 2.0f;
+        bounds.size.x = newWidth;
+        bounds.size.y = newHeight;
         return bounds;
     }
 
     sf::Vector2f getShootPosition() const {
+        sf::FloatRect bounds = sprite.getGlobalBounds();
+        float shootY = y - (bounds.size.y * 0.5f);
         if (facingDirection == 1) {
-            return sf::Vector2f(x + 65, y + (isDucking ? 35 : 10));
+            return sf::Vector2f(bounds.position.x + bounds.size.x, shootY);
         } else {
-            return sf::Vector2f(x - 5, y + (isDucking ? 35 : 10));
+            return sf::Vector2f(bounds.position.x, shootY);
         }
     }
 
@@ -321,19 +249,19 @@ public:
             
             health = 2;
         } else {
-            // Cactus enemigo mejorado
-            body.setSize(sf::Vector2f(35, 55));
+            // Cactus enemigo - tamaño ajustado para coincidir con el personaje
+            body.setSize(sf::Vector2f(30, 50));
             body.setFillColor(sf::Color(40, 120, 40));
             body.setOutlineColor(sf::Color(30, 80, 30));
             body.setOutlineThickness(2);
             
-            spike1.setSize(sf::Vector2f(12, 22));
+            spike1.setSize(sf::Vector2f(10, 18));
             spike1.setFillColor(sf::Color(40, 120, 40));
             
-            spike2.setSize(sf::Vector2f(12, 22));
+            spike2.setSize(sf::Vector2f(10, 18));
             spike2.setFillColor(sf::Color(40, 120, 40));
             
-            spike3.setSize(sf::Vector2f(8, 15));
+            spike3.setSize(sf::Vector2f(8, 12));
             spike3.setFillColor(sf::Color(40, 120, 40));
             
             health = 3;
@@ -352,7 +280,7 @@ public:
         
         if (isFlying) {
             // Efecto de vuelo ondulante más suave
-            float offset = std::sin(hoverClock.getElapsedTime().asSeconds() * 2.5f) * 12.0f;
+            float offset = std::sin(hoverClock.getElapsedTime().asSeconds() * 2.5f) * 8.0f;
             body.setPosition(sf::Vector2f(body.getPosition().x, baseY + offset));
             
             // Alas con animación
@@ -365,12 +293,12 @@ public:
             spike3.setPosition(sf::Vector2f(x + 40, y + 10)); // Pico
             weak_spot.setPosition(sf::Vector2f(x + 15, y + 8));
         } else {
-            // Espinas del cactus
+            // Espinas del cactus - ajustadas al tamaño
             float x = body.getPosition().x;
             float y = body.getPosition().y;
             spike1.setPosition(sf::Vector2f(x - 8, y + 12));
-            spike2.setPosition(sf::Vector2f(x + body.getSize().x - 4, y + 28));
-            spike3.setPosition(sf::Vector2f(x + body.getSize().x / 2 - 4, y - 10));
+            spike2.setPosition(sf::Vector2f(x + body.getSize().x - 2, y + 25));
+            spike3.setPosition(sf::Vector2f(x + body.getSize().x / 2 - 4, y - 8));
             weak_spot.setPosition(sf::Vector2f(x + 13, y + 20));
         }
         
@@ -486,7 +414,7 @@ int main() {
 
     // Cargar imagen de fondo
     sf::Texture backgroundTexture;
-    bool backgroundLoaded = backgroundTexture.loadFromFile("./assets/images/fondo.jpeg");
+    bool backgroundLoaded = backgroundTexture.loadFromFile("./assets/images/fondo.png");
     backgroundTexture.setRepeated(true);
     sf::Sprite backgroundSprite(backgroundTexture);
     sf::Sprite backgroundSprite2(backgroundTexture);
@@ -511,7 +439,10 @@ int main() {
         backgroundSprite2.setPosition(sf::Vector2f(bgX2, 0));
     }
 
-    float groundY = WINDOW_HEIGHT - GROUND_HEIGHT - 80;
+    // Posición del suelo (donde el dino camina)
+    // WINDOW_HEIGHT = 600, GROUND_HEIGHT = 50
+    // El personaje debe estar exactamente sobre el rectángulo del suelo
+    float groundY = WINDOW_HEIGHT - GROUND_HEIGHT; // 550
     
     Dino dino(100, groundY);
     std::vector<Projectile> projectiles;
@@ -663,13 +594,16 @@ int main() {
                 int enemyType = std::rand() % 10;
                 
                 if (enemyType < 4) {
-                    // Ave voladora
+                    // Ave voladora - a diferentes alturas alcanzables con salto
                     int height = std::rand() % 3;
-                    float birdY = groundY - 50 - (height * 40);
+                    float birdY = groundY - 60 - (height * 25); // Alturas: -60, -85, -110 (más bajas)
                     enemies.push_back(Enemy(WINDOW_WIDTH, birdY, true));
                 } else {
-                    // Cactus terrestre
-                    enemies.push_back(Enemy(WINDOW_WIDTH, groundY + 30, false));
+                    // Cactus terrestre - pegado al suelo
+                    // El cactus se dibuja desde su posición hacia abajo, así que la posición Y
+                    // debe ser groundY menos la altura del cactus para que la base toque el suelo
+                    float cactusY = groundY - 50; // groundY menos altura del cactus (50px)
+                    enemies.push_back(Enemy(WINDOW_WIDTH, cactusY, false));
                 }
                 
                 nextEnemyTime = 1.5f + static_cast<float>(std::rand() % 100) / 100.0f;
@@ -761,6 +695,7 @@ int main() {
         if (backgroundLoaded) {
             window.clear();
             window.draw(backgroundSprite);
+            window.draw(backgroundSprite2);
         } else {
             window.clear(sf::Color(135, 206, 235)); // Cielo azul
         }
