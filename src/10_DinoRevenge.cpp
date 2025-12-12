@@ -484,6 +484,33 @@ int main() {
     sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Dino Revenge");
     window.setFramerateLimit(60);
 
+    // Cargar imagen de fondo
+    sf::Texture backgroundTexture;
+    bool backgroundLoaded = backgroundTexture.loadFromFile("./assets/images/fondo.jpeg");
+    backgroundTexture.setRepeated(true);
+    sf::Sprite backgroundSprite(backgroundTexture);
+    sf::Sprite backgroundSprite2(backgroundTexture);
+    
+    float bgScrollSpeed = 2.0f;
+    float bgX1 = 0.0f;
+    float bgX2 = 0.0f;
+    
+    if (backgroundLoaded) {
+        // Escalar el fondo manteniendo la proporción
+        sf::Vector2u texSize = backgroundTexture.getSize();
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / texSize.y;
+        float scaleX = scaleY; // Mantener proporción
+        backgroundSprite.setScale(sf::Vector2f(scaleX, scaleY));
+        backgroundSprite2.setScale(sf::Vector2f(scaleX, scaleY));
+        
+        // Calcular el ancho escalado
+        float scaledWidth = texSize.x * scaleX;
+        bgX2 = scaledWidth;
+        
+        backgroundSprite.setPosition(sf::Vector2f(bgX1, 0));
+        backgroundSprite2.setPosition(sf::Vector2f(bgX2, 0));
+    }
+
     float groundY = WINDOW_HEIGHT - GROUND_HEIGHT - 80;
     
     Dino dino(100, groundY);
@@ -588,6 +615,28 @@ int main() {
         }
 
         if (gameStarted && !gameOver) {
+            // Actualizar scroll del fondo
+            if (backgroundLoaded) {
+                bgX1 -= bgScrollSpeed;
+                bgX2 -= bgScrollSpeed;
+                
+                // Obtener el ancho escalado
+                sf::Vector2u texSize = backgroundTexture.getSize();
+                float scaleY = static_cast<float>(WINDOW_HEIGHT) / texSize.y;
+                float scaledWidth = texSize.x * scaleY;
+                
+                // Reposicionar cuando sale de la pantalla
+                if (bgX1 + scaledWidth <= 0) {
+                    bgX1 = bgX2 + scaledWidth;
+                }
+                if (bgX2 + scaledWidth <= 0) {
+                    bgX2 = bgX1 + scaledWidth;
+                }
+                
+                backgroundSprite.setPosition(sf::Vector2f(bgX1, 0));
+                backgroundSprite2.setPosition(sf::Vector2f(bgX2, 0));
+            }
+            
             // Control de agacharse
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || 
                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
@@ -709,7 +758,12 @@ int main() {
         }
 
         // Dibujar
-        window.clear(sf::Color(135, 206, 235)); // Cielo azul
+        if (backgroundLoaded) {
+            window.clear();
+            window.draw(backgroundSprite);
+        } else {
+            window.clear(sf::Color(135, 206, 235)); // Cielo azul
+        }
 
         // Dibujar suelo
         window.draw(ground);
