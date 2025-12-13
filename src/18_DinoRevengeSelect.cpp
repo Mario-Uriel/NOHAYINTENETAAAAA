@@ -128,14 +128,14 @@ public:
     }
 
     void moveLeft() {
-        x -= 5;
-        if (x < 20) x = 20;
+        x -= 8.0f;
+        if (x < 50) x = 50;
         facingDirection = -1;
     }
 
     void moveRight() {
-        x += 5;
-        if (x > WINDOW_WIDTH - 100) x = WINDOW_WIDTH - 100;
+        x += 8.0f;
+        if (x > WINDOW_WIDTH - 50) x = WINDOW_WIDTH - 50;
         facingDirection = 1;
     }
 
@@ -156,7 +156,6 @@ public:
         }
 
         sprite.setTexture(*walkTexture);
-        sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
         sf::Vector2u texSize = walkTexture->getSize();
         int frameWidth = texSize.x / numFrames;
         
@@ -176,10 +175,14 @@ public:
             animationClock.restart();
         }
         
+        // Aplicar escala según la dirección
         if (facingDirection == -1) {
             sprite.setScale(sf::Vector2f(-spriteScale, spriteScale));
+        } else {
+            sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
         }
         
+        // IMPORTANTE: Actualizar posición del sprite con las coordenadas x, y
         sprite.setPosition(sf::Vector2f(x, y));
     }
 
@@ -564,9 +567,12 @@ int main() {
 
     sf::Clock enemySpawnClock;
     float spawnInterval = 2.0f;
+    int lastEnemyType = -1; // -1=ninguno, 0=Gengar, 1=Camioneta, 2=Mewtwo
+    int consecutiveTrucks = 0; // Contador de camionetas consecutivas
 
     int score = 0;
     int lives = 3;
+    int highScore = 0; // Marcador de puntuación máxima
 
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
@@ -584,6 +590,18 @@ int main() {
     livesText.setCharacterSize(24);
     livesText.setPosition(sf::Vector2f(10, 40));
     livesText.setFillColor(sf::Color::Red);
+    
+    sf::Text highScoreText(font);
+    highScoreText.setString("High Score: 0");
+    highScoreText.setCharacterSize(24);
+    highScoreText.setPosition(sf::Vector2f(10, 70));
+    highScoreText.setFillColor(sf::Color::Yellow);
+    
+    // Texto de debug para mostrar posición X del personaje
+    sf::Text debugText(font);
+    debugText.setCharacterSize(20);
+    debugText.setPosition(sf::Vector2f(10, 100));
+    debugText.setFillColor(sf::Color::Cyan);
 
     bool gameOver = false;
     sf::Text gameOverText(font);
@@ -625,21 +643,27 @@ int main() {
                     lives = 3;
                     gameOver = false;
                     enemySpawnClock.restart();
+                    lastEnemyType = -1;
+                    consecutiveTrucks = 0;
+                    spawnInterval = 2.0f;
                 }
             }
         }
 
         if (!gameOver) {
-            // Controles
-            bool isDuckingPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
-            dino.duck(isDuckingPressed);
-
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
+            // Controles de movimiento horizontal (A/D o Flechas Izquierda/Derecha)
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
                 dino.moveLeft();
             }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
                 dino.moveRight();
             }
+            
+            // Control de agacharse
+            bool isDuckingPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
+            dino.duck(isDuckingPressed);
+            
+            // Control de disparo
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::X) && dino.canShoot()) {
                 sf::Vector2f shootPos = dino.getShootPosition();
                 projectiles.push_back(Projectile(shootPos.x, shootPos.y, dino.facingDirection));
@@ -668,13 +692,41 @@ int main() {
             }
 
             // Spawn enemigos - seleccionar aleatoriamente entre Gengar, Camioneta y Mewtwo
-            if (enemySpawnClock.getElapsedTime().asSeconds() > (spawnInterval / gameSpeedMultiplier)) {
+            float currentSpawnInterval = spawnInterval;
+            
+            // Si el último enemigo fue una camioneta, usar intervalo más largo
+            if (lastEnemyType == 1) {
+                currentSpawnInterval = std::max(3.5f, spawnInterval * 1.8f); // Mínimo 3.5 segundos después de una camioneta
+            }
+            
+            if (enemySpawnClock.getElapsedTime().asSeconds() > (currentSpawnInterval / gameSpeedMultiplier)) {
                 int randomEnemy = rand() % 3; // 0=Gengar, 1=Camioneta, 2=Mewtwo
+                
+                // Si el último enemigo fue una camioneta, evitar generar otra camioneta
+                // (75% de probabilidad de evitarla, 25% de permitirla)
+                if (lastEnemyType == 1 && randomEnemy == 1 && (rand() % 100) < 75) {
+                    randomEnemy = (rand() % 2 == 0) ? 0 : 2; // Gengar o Mewtwo en su lugar
+                }
+                
+                // Limitar camionetas consecutivas a máximo 1
+                if (randomEnemy == 1 && consecutiveTrucks >= 1) {
+                    randomEnemy = (rand() % 2 == 0) ? 0 : 2; // Forzar Gengar o Mewtwo
+                }
+                
                 enemies.push_back(Enemy(WINDOW_WIDTH, groundY, enemyTextures[randomEnemy], enemyFrames[randomEnemy], randomEnemy));
                 enemySpawnClock.restart();
                 
-                if (score > 0 && score % 10 == 0 && spawnInterval > 1.0f) {
-                    spawnInterval -= 0.05f; // Reducción más gradual
+                // Actualizar contador de camionetas consecutivas
+                if (randomEnemy == 1) {
+                    consecutiveTrucks++;
+                } else {
+                    consecutiveTrucks = 0;
+                }
+                
+                lastEnemyType = randomEnemy;
+                
+                if (score > 0 && score % 10 == 0 && spawnInterval > 1.2f) {
+                    spawnInterval -= 0.05f; // Reducción más gradual, mínimo 1.2s
                 }
             }
 
@@ -698,6 +750,10 @@ int main() {
                 for (auto& enemy : enemies) {
                     if (projectile.active && enemy.active && 
                         projectile.getBounds().findIntersection(enemy.getBounds()).has_value()) {
+                        // La camioneta (tipo 1) es inmune a las balas - las balas la traspasan
+                        if (enemy.type == 1) {
+                            continue; // La bala no se destruye y la camioneta no recibe daño
+                        }
                         projectile.active = false;
                         enemy.active = false;
                         score += 10;
@@ -728,6 +784,13 @@ int main() {
             // Actualizar textos
             scoreText.setString("Score: " + std::to_string(score));
             livesText.setString("Lives: " + std::to_string(lives));
+            debugText.setString("X: " + std::to_string(static_cast<int>(dino.x)) + " | Usa A/D o Flechas");
+            
+            // Actualizar high score si se supera
+            if (score > highScore) {
+                highScore = score;
+                highScoreText.setString("High Score: " + std::to_string(highScore));
+            }
         }
 
         // Dibujar
@@ -753,6 +816,8 @@ int main() {
         
         window.draw(scoreText);
         window.draw(livesText);
+        window.draw(highScoreText);
+        window.draw(debugText);
         
         if (gameOver) {
             window.draw(gameOverText);
