@@ -566,6 +566,20 @@ MenuState showMainMenu(sf::RenderWindow& window, sf::Music& menuMusic, GameConfi
 
 // Función para seleccionar dificultad
 GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
+    // Cargar fondo
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+    }
+    
+    // Overlay semitransparente
+    sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    overlay.setFillColor(sf::Color(0, 0, 0, 150));
+    
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
         return GameDifficulty::NORMAL;
@@ -573,9 +587,11 @@ GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
     
     sf::Text titleText(font);
     titleText.setString("SELECCIONA LA DIFICULTAD");
-    titleText.setCharacterSize(40);
+    titleText.setCharacterSize(45);
     titleText.setFillColor(sf::Color::Yellow);
-    titleText.setPosition(sf::Vector2f(220, 100));
+    titleText.setOutlineColor(sf::Color::Black);
+    titleText.setOutlineThickness(3);
+    titleText.setPosition(sf::Vector2f(180, 80));
     
     std::vector<std::string> difficulties = {
         "1. FACIL - Todo mas lento, menos puntos",
@@ -589,9 +605,11 @@ GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
     for (size_t i = 0; i < difficulties.size(); ++i) {
         sf::Text text(font);
         text.setString(difficulties[i]);
-        text.setCharacterSize(28);
+        text.setCharacterSize(26);
         text.setFillColor(sf::Color::White);
-        text.setPosition(sf::Vector2f(150, 250 + i * 80));
+        text.setOutlineColor(sf::Color::Black);
+        text.setOutlineThickness(2);
+        text.setPosition(sf::Vector2f(130, 220 + i * 80));
         diffTexts.push_back(text);
     }
     
@@ -629,6 +647,10 @@ GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
         }
         
         window.clear(sf::Color(20, 20, 40));
+        if (hasBackground) {
+            window.draw(bgSprite);
+            window.draw(overlay);
+        }
         window.draw(titleText);
         for (auto& text : diffTexts) {
             window.draw(text);
@@ -641,6 +663,20 @@ GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
 
 // Función para mostrar configuraciones
 void showSettings(sf::RenderWindow& window, GameConfig& config) {
+    // Cargar fondo
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+    }
+    
+    // Overlay semitransparente
+    sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    overlay.setFillColor(sf::Color(0, 0, 0, 150));
+    
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
         return;
@@ -648,25 +684,33 @@ void showSettings(sf::RenderWindow& window, GameConfig& config) {
     
     sf::Text titleText(font);
     titleText.setString("CONFIGURACIONES");
-    titleText.setCharacterSize(40);
+    titleText.setCharacterSize(45);
     titleText.setFillColor(sf::Color::Yellow);
-    titleText.setPosition(sf::Vector2f(320, 80));
+    titleText.setOutlineColor(sf::Color::Black);
+    titleText.setOutlineThickness(3);
+    titleText.setPosition(sf::Vector2f(280, 80));
     
     sf::Text musicText(font);
     musicText.setCharacterSize(30);
     musicText.setFillColor(sf::Color::White);
-    musicText.setPosition(sf::Vector2f(200, 200));
+    musicText.setOutlineColor(sf::Color::Black);
+    musicText.setOutlineThickness(2);
+    musicText.setPosition(sf::Vector2f(200, 220));
     
     sf::Text sfxText(font);
     sfxText.setCharacterSize(30);
     sfxText.setFillColor(sf::Color::White);
-    sfxText.setPosition(sf::Vector2f(200, 280));
+    sfxText.setOutlineColor(sf::Color::Black);
+    sfxText.setOutlineThickness(2);
+    sfxText.setPosition(sf::Vector2f(200, 300));
     
     sf::Text instructionText(font);
     instructionText.setString("Usa Flechas para ajustar, ESC para salir");
-    instructionText.setCharacterSize(20);
-    instructionText.setFillColor(sf::Color(200, 200, 200));
-    instructionText.setPosition(sf::Vector2f(250, 450));
+    instructionText.setCharacterSize(22);
+    instructionText.setFillColor(sf::Color::White);
+    instructionText.setOutlineColor(sf::Color::Black);
+    instructionText.setOutlineThickness(2);
+    instructionText.setPosition(sf::Vector2f(230, 480));
     
     int selectedSetting = 0; // 0 = música, 1 = sfx
     
@@ -708,6 +752,10 @@ void showSettings(sf::RenderWindow& window, GameConfig& config) {
         sfxText.setFillColor(selectedSetting == 1 ? sf::Color::Yellow : sf::Color::White);
         
         window.clear(sf::Color(20, 20, 40));
+        if (hasBackground) {
+            window.draw(bgSprite);
+            window.draw(overlay);
+        }
         window.draw(titleText);
         window.draw(musicText);
         window.draw(sfxText);
@@ -1056,24 +1104,18 @@ int showCharacterSelection(sf::RenderWindow& window) {
     // Cargar fondo principal
     sf::Texture backgroundTexture;
     if (!backgroundTexture.loadFromFile("assets/images/Fondo principal.png")) {
-        return 0; // Error cargando fondo
+        // Si falla, intentar con el fondo del menú
+        if (!backgroundTexture.loadFromFile("assets/images/Menu principal.png")) {
+            return 0; // Error cargando fondo
+        }
     }
     sf::Sprite backgroundSprite(backgroundTexture);
     
-    // Escalar el fondo para que cubra toda la ventana sin distorsión
+    // Escalar el fondo para que cubra toda la ventana
     sf::Vector2u bgSize = backgroundTexture.getSize();
     float scaleX = static_cast<float>(WINDOW_WIDTH) / bgSize.x;
     float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgSize.y;
-    float scale = std::max(scaleX, scaleY); // Usar el mayor para cubrir toda la ventana
-    backgroundSprite.setScale(sf::Vector2f(scale, scale));
-    
-    // Centrar el fondo si es necesario
-    float bgWidth = bgSize.x * scale;
-    float bgHeight = bgSize.y * scale;
-    backgroundSprite.setPosition(sf::Vector2f(
-        (WINDOW_WIDTH - bgWidth) / 2.0f,
-        (WINDOW_HEIGHT - bgHeight) / 2.0f
-    ));
+    backgroundSprite.setScale(sf::Vector2f(scaleX, scaleY));
     
     // Cargar personajes
     CharacterInfo pika, ballesta;
@@ -1099,17 +1141,17 @@ int showCharacterSelection(sf::RenderWindow& window) {
     sf::Vector2u pikaSize = pika.texture.getSize();
     int pikaFrameWidth = pikaSize.x / pika.numFrames;
     pikaSprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(pikaFrameWidth, pikaSize.y)));
-    float pikaScale = 250.0f / pikaSize.y;
+    float pikaScale = 200.0f / pikaSize.y; // Reducir tamaño a 200px
     pikaSprite.setScale(sf::Vector2f(pikaScale, pikaScale));
-    pikaSprite.setPosition(sf::Vector2f(200, 250));
+    pikaSprite.setPosition(sf::Vector2f(150, 220));
     
     // Configurar escala y posición para Ballesta (derecha)
     sf::Vector2u ballestaSize = ballesta.texture.getSize();
     int ballestaFrameWidth = ballestaSize.x / ballesta.numFrames;
     ballestaSprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(ballestaFrameWidth, ballestaSize.y)));
-    float ballestaScale = 250.0f / ballestaSize.y;
+    float ballestaScale = 200.0f / ballestaSize.y; // Reducir tamaño a 200px
     ballestaSprite.setScale(sf::Vector2f(ballestaScale, ballestaScale));
-    ballestaSprite.setPosition(sf::Vector2f(600, 250));
+    ballestaSprite.setPosition(sf::Vector2f(550, 220));
     
     // Cargar fuente
     sf::Font font;
@@ -1120,40 +1162,48 @@ int showCharacterSelection(sf::RenderWindow& window) {
     // Textos
     sf::Text titleText(font);
     titleText.setString("SELECCIONA TU PERSONAJE");
-    titleText.setCharacterSize(40);
-    titleText.setFillColor(sf::Color::White);
-    titleText.setPosition(sf::Vector2f(250, 50));
+    titleText.setCharacterSize(45);
+    titleText.setFillColor(sf::Color::Yellow);
+    titleText.setOutlineColor(sf::Color::Black);
+    titleText.setOutlineThickness(3);
+    titleText.setPosition(sf::Vector2f(180, 80));
     
     sf::Text pikaText(font);
     pikaText.setString("PIKA");
     pikaText.setCharacterSize(30);
-    pikaText.setFillColor(sf::Color::White);
-    pikaText.setPosition(sf::Vector2f(210, 450));
+    pikaText.setFillColor(sf::Color::Yellow);
+    pikaText.setOutlineColor(sf::Color::Black);
+    pikaText.setOutlineThickness(2);
+    pikaText.setPosition(sf::Vector2f(180, 430));
     
     sf::Text ballestaText(font);
     ballestaText.setString("UMBREON");
     ballestaText.setCharacterSize(30);
-    ballestaText.setFillColor(sf::Color::White);
-    ballestaText.setPosition(sf::Vector2f(590, 450));
+    ballestaText.setFillColor(sf::Color::Yellow);
+    ballestaText.setOutlineColor(sf::Color::Black);
+    ballestaText.setOutlineThickness(2);
+    ballestaText.setPosition(sf::Vector2f(550, 430));
     
     sf::Text instructionText(font);
-    instructionText.setString("Presiona 1 para PIKA o 2 para UMBREON");
-    instructionText.setCharacterSize(20);
-    instructionText.setFillColor(sf::Color(200, 200, 200));
-    instructionText.setPosition(sf::Vector2f(280, 520));
+    instructionText.setString("Presiona 1 para PIKA o 2 para UMBREON | Flechas + Enter");
+    instructionText.setCharacterSize(18);
+    instructionText.setFillColor(sf::Color::White);
+    instructionText.setOutlineColor(sf::Color::Black);
+    instructionText.setOutlineThickness(2);
+    instructionText.setPosition(sf::Vector2f(180, 520));
     
     // Indicadores de selección (marcos)
     sf::RectangleShape pikaFrame(sf::Vector2f(pikaFrameWidth * pikaScale + 20, pikaSize.y * pikaScale + 20));
     pikaFrame.setFillColor(sf::Color::Transparent);
     pikaFrame.setOutlineColor(sf::Color::Yellow);
     pikaFrame.setOutlineThickness(5);
-    pikaFrame.setPosition(sf::Vector2f(190, 240));
+    pikaFrame.setPosition(sf::Vector2f(140, 210));
     
     sf::RectangleShape ballestaFrame(sf::Vector2f(ballestaFrameWidth * ballestaScale + 20, ballestaSize.y * ballestaScale + 20));
     ballestaFrame.setFillColor(sf::Color::Transparent);
     ballestaFrame.setOutlineColor(sf::Color::Yellow);
     ballestaFrame.setOutlineThickness(5);
-    ballestaFrame.setPosition(sf::Vector2f(590, 240));
+    ballestaFrame.setPosition(sf::Vector2f(540, 210));
     
     // Overlay semitransparente para mejorar la legibilidad
     sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
