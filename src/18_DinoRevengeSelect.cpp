@@ -612,6 +612,22 @@ int main() {
     // Reproducir la primera música del juego
     gameMusic1.play();
     int currentMusic = 1; // 1 = Jugar1, 2 = Jugar2
+    
+    // Cargar sonidos de disparo según el personaje
+    sf::Music shootSound;
+    if (selectedCharacter == 0) {
+        // Pikachu usa AK-47
+        if (!shootSound.openFromFile("assets/music/AK-47.ogg")) {
+            return -1;
+        }
+    } else {
+        // Umbreon usa Ballesta
+        if (!shootSound.openFromFile("assets/music/Ballesta sonido.ogg")) {
+            return -1;
+        }
+    }
+    shootSound.setLooping(true); // Sonido en bucle mientras se dispara
+    bool isShooting = false;
 
     // Suelo
     sf::RectangleShape ground(sf::Vector2f(WINDOW_WIDTH, GROUND_HEIGHT));
@@ -678,9 +694,11 @@ int main() {
                     dino.jump();
                 }
                 if (keyPressed->code == sf::Keyboard::Key::R && gameOver) {
-                    // Detener músicas del juego
+                    // Detener músicas y sonidos del juego
                     gameMusic1.stop();
                     gameMusic2.stop();
+                    shootSound.stop();
+                    isShooting = false;
                     
                     // Reiniciar juego - volver a mostrar selección
                     selectedCharacter = showCharacterSelection(window);
@@ -695,6 +713,15 @@ int main() {
                     } else {
                         characterTexture.loadFromFile("assets/images/Ballesta .png");
                     }
+                    
+                    // Recargar sonido de disparo según el personaje
+                    shootSound.stop();
+                    if (selectedCharacter == 0) {
+                        shootSound.openFromFile("assets/music/AK-47.ogg");
+                    } else {
+                        shootSound.openFromFile("assets/music/Ballesta sonido.ogg");
+                    }
+                    shootSound.setLooping(true);
                     
                     dino = Dino(100, playerGroundY, &characterTexture, numFrames);
                     enemies.clear();
@@ -739,11 +766,29 @@ int main() {
             bool isDuckingPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
             dino.duck(isDuckingPressed);
             
-            // Control de disparo
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::X) && dino.canShoot()) {
-                sf::Vector2f shootPos = dino.getShootPosition();
-                projectiles.push_back(Projectile(shootPos.x, shootPos.y, dino.facingDirection));
-                dino.resetShootClock();
+            // Control de disparo con tecla R o clic izquierdo del ratón
+            bool shootKeyPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R) || 
+                                   sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
+            
+            if (shootKeyPressed) {
+                // Reproducir sonido de disparo en bucle mientras se dispara
+                if (!isShooting) {
+                    shootSound.play();
+                    isShooting = true;
+                }
+                
+                // Disparar proyectiles
+                if (dino.canShoot()) {
+                    sf::Vector2f shootPos = dino.getShootPosition();
+                    projectiles.push_back(Projectile(shootPos.x, shootPos.y, dino.facingDirection));
+                    dino.resetShootClock();
+                }
+            } else {
+                // Detener sonido cuando se suelta la tecla
+                if (isShooting) {
+                    shootSound.stop();
+                    isShooting = false;
+                }
             }
 
             // Actualizar personaje con su posición de suelo ajustada
@@ -845,6 +890,9 @@ int main() {
                     lives--;
                     if (lives <= 0) {
                         gameOver = true;
+                        // Detener sonido de disparo al morir
+                        shootSound.stop();
+                        isShooting = false;
                     }
                 }
             }
