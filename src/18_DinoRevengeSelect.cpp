@@ -5,12 +5,37 @@
 #include <ctime>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iostream>
 
 const int WINDOW_WIDTH = 1000;
 const int WINDOW_HEIGHT = 600;
 const int GROUND_HEIGHT = 50;
 const float GRAVITY = 0.4f;
 const float JUMP_STRENGTH = -15.0f;
+
+// Enumeraciones para menús y dificultad
+enum class GameDifficulty {
+    EASY,
+    NORMAL,
+    HARD
+};
+
+enum class MenuState {
+    MAIN_MENU,
+    DIFFICULTY_SELECT,
+    CHARACTER_SELECT,
+    SETTINGS,
+    HIGH_SCORES,
+    PLAYING
+};
+
+// Estructura de configuración global
+struct GameConfig {
+    float musicVolume = 50.0f;
+    float sfxVolume = 50.0f;
+    int globalHighScore = 0;
+};
 
 // Estructura para almacenar información de personajes
 struct CharacterInfo {
@@ -19,6 +44,27 @@ struct CharacterInfo {
     sf::Texture texture;
     int numFrames;
 };
+
+// Funciones para guardar y cargar configuración
+void saveConfig(const GameConfig& config) {
+    std::ofstream file("game_config.dat");
+    if (file.is_open()) {
+        file << config.musicVolume << "\n";
+        file << config.sfxVolume << "\n";
+        file << config.globalHighScore << "\n";
+        file.close();
+    }
+}
+
+void loadConfig(GameConfig& config) {
+    std::ifstream file("game_config.dat");
+    if (file.is_open()) {
+        file >> config.musicVolume;
+        file >> config.sfxVolume;
+        file >> config.globalHighScore;
+        file.close();
+    }
+}
 
 class Projectile {
 public:
@@ -81,14 +127,16 @@ public:
     sf::Clock shootClock;
     int numFrames;
     float spriteScale;
+    float shootCooldownTime;
 
-    Dino(float startX, float startY, sf::Texture* texture, int frames) : sprite(*texture) {
+    Dino(float startX, float startY, sf::Texture* texture, int frames, float cooldown = 0.25f) : sprite(*texture) {
         walkTexture = texture;
         x = startX;
         y = startY;
         facingDirection = 1;
         numFrames = frames;
         spriteScale = 0.6f;
+        shootCooldownTime = cooldown;
         
         sprite.setTexture(*walkTexture);
         sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
@@ -188,7 +236,7 @@ public:
     }
 
     bool canShoot() {
-        return shootClock.getElapsedTime().asSeconds() > 0.25f;
+        return shootClock.getElapsedTime().asSeconds() > shootCooldownTime;
     }
 
     void resetShootClock() {
@@ -340,6 +388,316 @@ public:
         return sprite.getGlobalBounds();
     }
 };
+
+// Función para mostrar el menú principal
+MenuState showMainMenu(sf::RenderWindow& window, sf::Music& menuMusic, GameConfig& config) {
+    // Cargar fondo del menú
+    sf::Texture backgroundTexture;
+    if (!backgroundTexture.loadFromFile("assets/images/Menu principal.png")) {
+        return MenuState::PLAYING; // Si falla, ir directo al juego
+    }
+    sf::Sprite backgroundSprite(backgroundTexture);
+    
+    // Escalar fondo
+    sf::Vector2u bgSize = backgroundTexture.getSize();
+    float scaleX = static_cast<float>(WINDOW_WIDTH) / bgSize.x;
+    float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgSize.y;
+    float scale = std::max(scaleX, scaleY);
+    backgroundSprite.setScale(sf::Vector2f(scale, scale));
+    backgroundSprite.setPosition(sf::Vector2f(
+        (WINDOW_WIDTH - bgSize.x * scale) / 2.0f,
+        (WINDOW_HEIGHT - bgSize.y * scale) / 2.0f
+    ));
+    
+    // Cargar fuente
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return MenuState::PLAYING;
+    }
+    
+    // Título
+    sf::Text titleText(font);
+    titleText.setString("PockyMan: Asalto a la Pokeplaza");
+    titleText.setCharacterSize(45);
+    titleText.setFillColor(sf::Color::Yellow);
+    titleText.setOutlineColor(sf::Color::Black);
+    titleText.setOutlineThickness(3);
+    titleText.setPosition(sf::Vector2f(150, 80));
+    
+    // Opciones del menú
+    std::vector<std::string> menuOptions = {
+        "1. Empezar Juego",
+        "2. Configuraciones",
+        "3. Registro de Record"
+    };
+    
+    std::vector<sf::Text> menuTexts;
+    int selectedOption = 0;
+    
+    for (size_t i = 0; i < menuOptions.size(); ++i) {
+        sf::Text text(font);
+        text.setString(menuOptions[i]);
+        text.setCharacterSize(35);
+        text.setFillColor(sf::Color::White);
+        text.setPosition(sf::Vector2f(300, 250 + i * 80));
+        menuTexts.push_back(text);
+    }
+    
+    // Overlay semitransparente
+    sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    overlay.setFillColor(sf::Color(0, 0, 0, 150));
+    
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return MenuState::MAIN_MENU;
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Up) {
+                    selectedOption = (selectedOption - 1 + menuOptions.size()) % menuOptions.size();
+                } else if (keyPressed->code == sf::Keyboard::Key::Down) {
+                    selectedOption = (selectedOption + 1) % menuOptions.size();
+                } else if (keyPressed->code == sf::Keyboard::Key::Enter || 
+                           keyPressed->code == sf::Keyboard::Key::Num1 ||
+                           keyPressed->code == sf::Keyboard::Key::Num2 ||
+                           keyPressed->code == sf::Keyboard::Key::Num3) {
+                    
+                    if (keyPressed->code == sf::Keyboard::Key::Num1) selectedOption = 0;
+                    else if (keyPressed->code == sf::Keyboard::Key::Num2) selectedOption = 1;
+                    else if (keyPressed->code == sf::Keyboard::Key::Num3) selectedOption = 2;
+                    
+                    if (selectedOption == 0) return MenuState::DIFFICULTY_SELECT;
+                    else if (selectedOption == 1) return MenuState::SETTINGS;
+                    else if (selectedOption == 2) return MenuState::HIGH_SCORES;
+                }
+            }
+        }
+        
+        // Actualizar colores de selección
+        for (size_t i = 0; i < menuTexts.size(); ++i) {
+            if (i == selectedOption) {
+                menuTexts[i].setFillColor(sf::Color::Yellow);
+                menuTexts[i].setOutlineColor(sf::Color::Black);
+                menuTexts[i].setOutlineThickness(2);
+            } else {
+                menuTexts[i].setFillColor(sf::Color::White);
+                menuTexts[i].setOutlineThickness(0);
+            }
+        }
+        
+        window.clear();
+        window.draw(backgroundSprite);
+        window.draw(overlay);
+        window.draw(titleText);
+        for (auto& text : menuTexts) {
+            window.draw(text);
+        }
+        window.display();
+    }
+    
+    return MenuState::MAIN_MENU;
+}
+
+// Función para seleccionar dificultad
+GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return GameDifficulty::NORMAL;
+    }
+    
+    sf::Text titleText(font);
+    titleText.setString("SELECCIONA LA DIFICULTAD");
+    titleText.setCharacterSize(40);
+    titleText.setFillColor(sf::Color::Yellow);
+    titleText.setPosition(sf::Vector2f(220, 100));
+    
+    std::vector<std::string> difficulties = {
+        "1. FACIL - Todo mas lento, menos puntos",
+        "2. NORMAL - Dificultad balanceada",
+        "3. DIFICIL - Todo mas rapido, cooldown en disparos"
+    };
+    
+    std::vector<sf::Text> diffTexts;
+    int selectedDiff = 1; // Normal por defecto
+    
+    for (size_t i = 0; i < difficulties.size(); ++i) {
+        sf::Text text(font);
+        text.setString(difficulties[i]);
+        text.setCharacterSize(28);
+        text.setFillColor(sf::Color::White);
+        text.setPosition(sf::Vector2f(150, 250 + i * 80));
+        diffTexts.push_back(text);
+    }
+    
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return GameDifficulty::NORMAL;
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Up) {
+                    selectedDiff = (selectedDiff - 1 + 3) % 3;
+                } else if (keyPressed->code == sf::Keyboard::Key::Down) {
+                    selectedDiff = (selectedDiff + 1) % 3;
+                } else if (keyPressed->code == sf::Keyboard::Key::Enter ||
+                           keyPressed->code == sf::Keyboard::Key::Num1 ||
+                           keyPressed->code == sf::Keyboard::Key::Num2 ||
+                           keyPressed->code == sf::Keyboard::Key::Num3) {
+                    
+                    if (keyPressed->code == sf::Keyboard::Key::Num1) return GameDifficulty::EASY;
+                    else if (keyPressed->code == sf::Keyboard::Key::Num2) return GameDifficulty::NORMAL;
+                    else if (keyPressed->code == sf::Keyboard::Key::Num3) return GameDifficulty::HARD;
+                    else return static_cast<GameDifficulty>(selectedDiff);
+                }
+            }
+        }
+        
+        for (size_t i = 0; i < diffTexts.size(); ++i) {
+            if (i == selectedDiff) {
+                diffTexts[i].setFillColor(sf::Color::Yellow);
+            } else {
+                diffTexts[i].setFillColor(sf::Color::White);
+            }
+        }
+        
+        window.clear(sf::Color(20, 20, 40));
+        window.draw(titleText);
+        for (auto& text : diffTexts) {
+            window.draw(text);
+        }
+        window.display();
+    }
+    
+    return GameDifficulty::NORMAL;
+}
+
+// Función para mostrar configuraciones
+void showSettings(sf::RenderWindow& window, GameConfig& config) {
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return;
+    }
+    
+    sf::Text titleText(font);
+    titleText.setString("CONFIGURACIONES");
+    titleText.setCharacterSize(40);
+    titleText.setFillColor(sf::Color::Yellow);
+    titleText.setPosition(sf::Vector2f(320, 80));
+    
+    sf::Text musicText(font);
+    musicText.setCharacterSize(30);
+    musicText.setFillColor(sf::Color::White);
+    musicText.setPosition(sf::Vector2f(200, 200));
+    
+    sf::Text sfxText(font);
+    sfxText.setCharacterSize(30);
+    sfxText.setFillColor(sf::Color::White);
+    sfxText.setPosition(sf::Vector2f(200, 280));
+    
+    sf::Text instructionText(font);
+    instructionText.setString("Usa Flechas para ajustar, ESC para salir");
+    instructionText.setCharacterSize(20);
+    instructionText.setFillColor(sf::Color(200, 200, 200));
+    instructionText.setPosition(sf::Vector2f(250, 450));
+    
+    int selectedSetting = 0; // 0 = música, 1 = sfx
+    
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return;
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Escape) {
+                    saveConfig(config);
+                    return;
+                } else if (keyPressed->code == sf::Keyboard::Key::Up) {
+                    selectedSetting = 0;
+                } else if (keyPressed->code == sf::Keyboard::Key::Down) {
+                    selectedSetting = 1;
+                } else if (keyPressed->code == sf::Keyboard::Key::Left) {
+                    if (selectedSetting == 0) {
+                        config.musicVolume = std::max(0.0f, config.musicVolume - 5.0f);
+                    } else {
+                        config.sfxVolume = std::max(0.0f, config.sfxVolume - 5.0f);
+                    }
+                } else if (keyPressed->code == sf::Keyboard::Key::Right) {
+                    if (selectedSetting == 0) {
+                        config.musicVolume = std::min(100.0f, config.musicVolume + 5.0f);
+                    } else {
+                        config.sfxVolume = std::min(100.0f, config.sfxVolume + 5.0f);
+                    }
+                }
+            }
+        }
+        
+        musicText.setString("Volumen Musica: " + std::to_string(static_cast<int>(config.musicVolume)) + "%");
+        musicText.setFillColor(selectedSetting == 0 ? sf::Color::Yellow : sf::Color::White);
+        
+        sfxText.setString("Volumen Efectos: " + std::to_string(static_cast<int>(config.sfxVolume)) + "%");
+        sfxText.setFillColor(selectedSetting == 1 ? sf::Color::Yellow : sf::Color::White);
+        
+        window.clear(sf::Color(20, 20, 40));
+        window.draw(titleText);
+        window.draw(musicText);
+        window.draw(sfxText);
+        window.draw(instructionText);
+        window.display();
+    }
+}
+
+// Función para mostrar récords
+void showHighScores(sf::RenderWindow& window, const GameConfig& config) {
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return;
+    }
+    
+    sf::Text titleText(font);
+    titleText.setString("REGISTRO DE RECORD");
+    titleText.setCharacterSize(40);
+    titleText.setFillColor(sf::Color::Yellow);
+    titleText.setPosition(sf::Vector2f(280, 150));
+    
+    sf::Text scoreText(font);
+    scoreText.setString("Puntuacion Maxima Global: " + std::to_string(config.globalHighScore));
+    scoreText.setCharacterSize(30);
+    scoreText.setFillColor(sf::Color::White);
+    scoreText.setPosition(sf::Vector2f(200, 300));
+    
+    sf::Text backText(font);
+    backText.setString("Presiona ESC para volver");
+    backText.setCharacterSize(20);
+    backText.setFillColor(sf::Color(200, 200, 200));
+    backText.setPosition(sf::Vector2f(320, 450));
+    
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return;
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Escape) {
+                    return;
+                }
+            }
+        }
+        
+        window.clear(sf::Color(20, 20, 40));
+        window.draw(titleText);
+        window.draw(scoreText);
+        window.draw(backText);
+        window.display();
+    }
+}
 
 // Función para mostrar el menú de selección de personaje
 int showCharacterSelection(sf::RenderWindow& window) {
@@ -531,11 +889,94 @@ int showCharacterSelection(sf::RenderWindow& window) {
 int main() {
     srand(static_cast<unsigned>(time(0)));
 
-    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Dino Revenge - Seleccion de Personaje");
+    // Cargar configuración
+    GameConfig gameConfig;
+    loadConfig(gameConfig);
+
+    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "PockyMan: Asalto a la Pokeplaza");
     window.setFramerateLimit(60);
 
-    // Mostrar menú de selección
-    int selectedCharacter = showCharacterSelection(window);
+    // Cargar música del menú principal
+    sf::Music menuMusic;
+    if (menuMusic.openFromFile("assets/music/Selecciona-tu-personaje.ogg")) {
+        menuMusic.setLooping(true);
+        menuMusic.setVolume(gameConfig.musicVolume);
+        menuMusic.play();
+    }
+
+    // Estado del juego
+    MenuState currentState = MenuState::MAIN_MENU;
+    GameDifficulty difficulty = GameDifficulty::NORMAL;
+    int selectedCharacter = -1;
+    bool shouldExit = false;
+
+    // Bucle principal del juego
+    while (window.isOpen() && !shouldExit) {
+        switch (currentState) {
+            case MenuState::MAIN_MENU: {
+                currentState = showMainMenu(window, menuMusic, gameConfig);
+                if (!window.isOpen()) shouldExit = true;
+                break;
+            }
+            
+            case MenuState::DIFFICULTY_SELECT: {
+                difficulty = showDifficultySelect(window);
+                if (!window.isOpen()) {
+                    shouldExit = true;
+                } else {
+                    currentState = MenuState::CHARACTER_SELECT;
+                }
+                break;
+            }
+            
+            case MenuState::CHARACTER_SELECT: {
+                selectedCharacter = showCharacterSelection(window);
+                if (selectedCharacter == -1 || !window.isOpen()) {
+                    shouldExit = true;
+                } else {
+                    currentState = MenuState::PLAYING;
+                }
+                break;
+            }
+            
+            case MenuState::SETTINGS: {
+                showSettings(window, gameConfig);
+                if (!window.isOpen()) {
+                    shouldExit = true;
+                } else {
+                    // Actualizar volumen de la música del menú
+                    menuMusic.setVolume(gameConfig.musicVolume);
+                    currentState = MenuState::MAIN_MENU;
+                }
+                break;
+            }
+            
+            case MenuState::HIGH_SCORES: {
+                showHighScores(window, gameConfig);
+                if (!window.isOpen()) {
+                    shouldExit = true;
+                } else {
+                    currentState = MenuState::MAIN_MENU;
+                }
+                break;
+            }
+            
+            case MenuState::PLAYING: {
+                // Detener música del menú
+                menuMusic.stop();
+                
+                // Iniciar el juego con la dificultad y personaje seleccionados
+                // (El código del juego va aquí)
+                goto START_GAME;
+            }
+        }
+    }
+    
+    saveConfig(gameConfig);
+    return 0;
+
+START_GAME:
+    // === INICIO DEL JUEGO ===
     
     if (selectedCharacter == -1) {
         return 0; // Ventana cerrada durante la selección
@@ -571,6 +1012,27 @@ int main() {
     sf::Texture* enemyTextures[] = {&gengarTexture, &camionetaTexture, &mewtwoTexture};
     int enemyFrames[] = {4, 3, 4}; // Frames por cada enemigo
 
+    // Aplicar modificadores de dificultad
+    float difficultySpeedMultiplier = 1.0f;
+    float difficultyScoreMultiplier = 1.0f;
+    float shootCooldown = 0.25f; // Tiempo entre disparos
+    
+    switch (difficulty) {
+        case GameDifficulty::EASY:
+            difficultySpeedMultiplier = 0.7f; // 70% de velocidad
+            difficultyScoreMultiplier = 0.5f; // 50% de puntos
+            break;
+        case GameDifficulty::NORMAL:
+            difficultySpeedMultiplier = 1.0f; // 100% de velocidad
+            difficultyScoreMultiplier = 1.0f; // 100% de puntos
+            break;
+        case GameDifficulty::HARD:
+            difficultySpeedMultiplier = 1.4f; // 140% de velocidad
+            difficultyScoreMultiplier = 1.5f; // 150% de puntos
+            shootCooldown = 0.5f; // Doble cooldown en disparos
+            break;
+    }
+
     // Calcular posición del suelo - personajes tocan el borde del suelo
     float groundY = WINDOW_HEIGHT - GROUND_HEIGHT;
     
@@ -578,7 +1040,7 @@ int main() {
     float playerGroundY = groundY + 70;
 
     // Crear personaje con la textura seleccionada
-    Dino dino(100, playerGroundY, &characterTexture, numFrames);
+    Dino dino(100, playerGroundY, &characterTexture, numFrames, shootCooldown);
 
     // Cargar fondo
     sf::Texture backgroundTexture;
@@ -598,7 +1060,7 @@ int main() {
     // Posicionar el segundo fondo para scroll continuo
     background2.setPosition(sf::Vector2f(bgSize.x * scaleX, 0));
     float backgroundSpeed = 2.0f;
-    float gameSpeedMultiplier = 1.0f;
+    float gameSpeedMultiplier = 1.0f * difficultySpeedMultiplier;
 
     // Cargar músicas del juego
     sf::Music gameMusic1, gameMusic2;
@@ -610,6 +1072,8 @@ int main() {
     }
     
     // Reproducir la primera música del juego
+    gameMusic1.setVolume(gameConfig.musicVolume);
+    gameMusic2.setVolume(gameConfig.musicVolume);
     gameMusic1.play();
     int currentMusic = 1; // 1 = Jugar1, 2 = Jugar2
     
@@ -627,6 +1091,7 @@ int main() {
         }
     }
     shootSound.setLooping(true); // Sonido en bucle mientras se dispara
+    shootSound.setVolume(gameConfig.sfxVolume);
     bool isShooting = false;
 
     // Suelo
@@ -645,7 +1110,7 @@ int main() {
 
     int score = 0;
     int lives = 3;
-    int highScore = 0; // Marcador de puntuación máxima
+    int highScore = gameConfig.globalHighScore; // Cargar marcador de puntuación máxima global
 
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
@@ -665,7 +1130,7 @@ int main() {
     livesText.setFillColor(sf::Color::Red);
     
     sf::Text highScoreText(font);
-    highScoreText.setString("High Score: 0");
+    highScoreText.setString("High Score: " + std::to_string(highScore));
     highScoreText.setCharacterSize(24);
     highScoreText.setPosition(sf::Vector2f(10, 70));
     highScoreText.setFillColor(sf::Color::Yellow);
@@ -678,7 +1143,7 @@ int main() {
 
     bool gameOver = false;
     sf::Text gameOverText(font);
-    gameOverText.setString("GAME OVER - Presiona R para Reiniciar");
+    gameOverText.setString("GAME OVER - R: Reiniciar | ESC: Menu");
     gameOverText.setCharacterSize(30);
     gameOverText.setPosition(sf::Vector2f(200, WINDOW_HEIGHT / 2));
     gameOverText.setFillColor(sf::Color::Red);
@@ -723,7 +1188,7 @@ int main() {
                     }
                     shootSound.setLooping(true);
                     
-                    dino = Dino(100, playerGroundY, &characterTexture, numFrames);
+                    dino = Dino(100, playerGroundY, &characterTexture, numFrames, shootCooldown);
                     enemies.clear();
                     projectiles.clear();
                     explosions.clear();
@@ -740,6 +1205,17 @@ int main() {
                     gameMusic2.stop();
                     gameMusic1.play();
                     currentMusic = 1;
+                }
+                if (keyPressed->code == sf::Keyboard::Key::Escape && gameOver) {
+                    // Detener todas las músicas y sonidos del juego
+                    gameMusic1.stop();
+                    gameMusic2.stop();
+                    shootSound.stop();
+                    isShooting = false;
+                    
+                    // Volver al menú principal
+                    currentState = MenuState::MAIN_MENU;
+                    shouldExit = true; // Salir del loop del juego para volver al loop del menú
                 }
             }
         }
@@ -877,7 +1353,7 @@ int main() {
                         }
                         projectile.active = false;
                         enemy.active = false;
-                        score += 10;
+                        score += static_cast<int>(10 * difficultyScoreMultiplier);
                         explosions.push_back(Explosion(enemy.x, enemy.y - 25));
                     }
                 }
@@ -914,6 +1390,12 @@ int main() {
             if (score > highScore) {
                 highScore = score;
                 highScoreText.setString("High Score: " + std::to_string(highScore));
+                
+                // Actualizar el high score global
+                if (score > gameConfig.globalHighScore) {
+                    gameConfig.globalHighScore = score;
+                    saveConfig(gameConfig);
+                }
             }
         }
 
