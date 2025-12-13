@@ -259,32 +259,67 @@ public:
 
 class Enemy {
 public:
-    sf::RectangleShape shape;
+    sf::Sprite sprite;
+    sf::Texture* texture;
     float x, y;
     float speed;
     bool active;
     int type;
+    int numFrames;
+    int currentFrame;
+    sf::Clock animClock;
+    float spriteScale;
 
-    Enemy(float startX, float groundY, int enemyType) {
+    Enemy(float startX, float groundY, sf::Texture* tex, int frames, int enemyType) : sprite(*tex) {
         x = startX;
-        type = 0; // Solo cactus terrestres
+        type = enemyType; // 0=Gengar, 1=Camioneta, 2=Mewtwo
         active = true;
         speed = 3.0f + (rand() % 3) * 0.5f;
-
-        // Cactus con altura aleatoria entre 60 y 100 píxeles
-        int randomHeight = 60 + (rand() % 41); // 60 a 100
-        int randomWidth = 30 + (rand() % 21);   // 30 a 50
+        texture = tex;
+        numFrames = frames;
+        currentFrame = 0;
         
-        shape.setSize(sf::Vector2f(randomWidth, randomHeight));
-        shape.setFillColor(sf::Color(34, 139, 34));
-        y = groundY;
-
-        shape.setPosition(sf::Vector2f(x, y - shape.getSize().y));
+        // Calcular escala y posición Y según el tipo de enemigo
+        sf::Vector2u texSize = texture->getSize();
+        float targetHeight;
+        
+        if (type == 0) { // Gengar - más grande y mucho más abajo
+            targetHeight = 180.0f;
+            y = 600.0f; // Posición Y mucho más abajo para confirmar cambio
+        } else if (type == 1) { // Camioneta - más abajo
+            targetHeight = 140.0f;
+            y = 595.0f; // Posición Y mucho más abajo para confirmar cambio
+        } else { // Mewtwo
+            targetHeight = 150.0f;
+            y = 590.0f; // Posición Y más abajo
+        }
+        
+        spriteScale = targetHeight / texSize.y;
+        
+        sprite.setTexture(*texture);
+        sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
+        
+        int frameWidth = texSize.x / numFrames;
+        
+        sprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(frameWidth, texSize.y)));
+        
+        // Origen en la base del sprite para que todos toquen el piso
+        sprite.setOrigin(sf::Vector2f(frameWidth / 2.0f, texSize.y));
+        sprite.setPosition(sf::Vector2f(x, y));
     }
 
     void update(float speedMultiplier = 1.0f) {
         x -= speed * speedMultiplier;
-        shape.setPosition(sf::Vector2f(x, y - shape.getSize().y));
+        sprite.setPosition(sf::Vector2f(x, y));
+        
+        // Animar sprite
+        if (animClock.getElapsedTime().asSeconds() > 0.12f) {
+            currentFrame = (currentFrame + 1) % numFrames;
+            sf::Vector2u texSize = texture->getSize();
+            int frameWidth = texSize.x / numFrames;
+            sprite.setTextureRect(sf::IntRect(sf::Vector2i(currentFrame * frameWidth, 0), sf::Vector2i(frameWidth, texSize.y)));
+            animClock.restart();
+        }
 
         if (x < -100) {
             active = false;
@@ -293,12 +328,12 @@ public:
 
     void draw(sf::RenderWindow& window) {
         if (active) {
-            window.draw(shape);
+            window.draw(sprite);
         }
     }
 
     sf::FloatRect getBounds() const {
-        return shape.getGlobalBounds();
+        return sprite.getGlobalBounds();
     }
 };
 
@@ -311,7 +346,7 @@ int showCharacterSelection(sf::RenderWindow& window) {
     pika.texturePath = "assets/images/PIKACHU (2) (1).png";
     pika.numFrames = 4;
     
-    ballesta.name = "BALLESTA";
+    ballesta.name = "Umbreon";
     ballesta.texturePath = "assets/images/Ballesta .png";
     ballesta.numFrames = 4;
     
@@ -360,13 +395,13 @@ int showCharacterSelection(sf::RenderWindow& window) {
     pikaText.setPosition(sf::Vector2f(210, 450));
     
     sf::Text ballestaText(font);
-    ballestaText.setString("BALLESTA");
+    ballestaText.setString("UMBREON");
     ballestaText.setCharacterSize(30);
     ballestaText.setFillColor(sf::Color::White);
-    ballestaText.setPosition(sf::Vector2f(580, 450));
+    ballestaText.setPosition(sf::Vector2f(590, 450));
     
     sf::Text instructionText(font);
-    instructionText.setString("Presiona 1 para PIKA o 2 para BALLESTA");
+    instructionText.setString("Presiona 1 para PIKA o 2 para UMBREON");
     instructionText.setCharacterSize(20);
     instructionText.setFillColor(sf::Color(200, 200, 200));
     instructionText.setPosition(sf::Vector2f(280, 520));
@@ -472,6 +507,22 @@ int main() {
             return -1;
         }
     }
+    
+    // Cargar texturas de enemigos
+    sf::Texture gengarTexture, camionetaTexture, mewtwoTexture;
+    if (!gengarTexture.loadFromFile("assets/images/Gengar.png")) {
+        return -1;
+    }
+    if (!camionetaTexture.loadFromFile("assets/images/Camioneta FINAL.png")) {
+        return -1;
+    }
+    if (!mewtwoTexture.loadFromFile("assets/images/Mewtwo (1).png")) {
+        return -1;
+    }
+    
+    // Array de texturas de enemigos para selección aleatoria
+    sf::Texture* enemyTextures[] = {&gengarTexture, &camionetaTexture, &mewtwoTexture};
+    int enemyFrames[] = {4, 3, 4}; // Frames por cada enemigo
 
     // Calcular posición del suelo - personajes tocan el borde del suelo
     float groundY = WINDOW_HEIGHT - GROUND_HEIGHT;
@@ -616,9 +667,10 @@ int main() {
                 background2.setPosition(sf::Vector2f(background1.getPosition().x + scaledBgWidth, 0));
             }
 
-            // Spawn enemigos - solo cactus terrestres con aparición más rápida
+            // Spawn enemigos - seleccionar aleatoriamente entre Gengar, Camioneta y Mewtwo
             if (enemySpawnClock.getElapsedTime().asSeconds() > (spawnInterval / gameSpeedMultiplier)) {
-                enemies.push_back(Enemy(WINDOW_WIDTH, groundY, 0));
+                int randomEnemy = rand() % 3; // 0=Gengar, 1=Camioneta, 2=Mewtwo
+                enemies.push_back(Enemy(WINDOW_WIDTH, groundY, enemyTextures[randomEnemy], enemyFrames[randomEnemy], randomEnemy));
                 enemySpawnClock.restart();
                 
                 if (score > 0 && score % 10 == 0 && spawnInterval > 1.0f) {
