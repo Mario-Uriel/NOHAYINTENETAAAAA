@@ -252,10 +252,10 @@ public:
         facingDirection = 1;
     }
 
-    void update(float groundY) {
+    void update(float groundY, bool fastFall = false) {
         if (isJumping) {
-            if (isDucking) {
-                velocityY += GRAVITY * 4.0f; // Caída más rápida al presionar abajo
+            if (fastFall) {
+                velocityY += GRAVITY * 4.0f; // Caída más rápida al presionar abajo/S
             } else {
                 velocityY += GRAVITY;
             }
@@ -1623,7 +1623,7 @@ START_GAME:
                 dino.moveRight();
             }
             
-            // Control de agacharse
+            // Control de agacharse y caída rápida
             bool isDuckingPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
             dino.duck(isDuckingPressed);
             
@@ -1652,8 +1652,8 @@ START_GAME:
                 }
             }
 
-            // Actualizar personaje con su posición de suelo ajustada
-            dino.update(playerGroundY);
+            // Actualizar personaje con su posición de suelo ajustada y caída rápida si presiona abajo/S
+            dino.update(playerGroundY, isDuckingPressed);
             
             // Aumentar velocidad del juego con el tiempo (cada 20 puntos)
             // La velocidad aumenta gradualmente pero respeta el multiplicador base de dificultad
