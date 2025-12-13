@@ -279,6 +279,16 @@ GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
         return GameDifficulty::NORMAL;
     }
     
+    // Cargar fondo del menú
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+    }
+    
     sf::Text titleText(font);
     titleText.setString("SELECCIONA LA DIFICULTAD");
     titleText.setCharacterSize(40);
@@ -357,6 +367,13 @@ GameDifficulty showDifficultySelect(sf::RenderWindow& window) {
         }
         
         window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        // Overlay semi-transparente
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 120));
+        window.draw(overlay);
+        
         window.draw(titleText);
         for (size_t i = 0; i < optionTexts.size(); ++i) {
             window.draw(optionTexts[i]);
@@ -374,6 +391,16 @@ void showSettings(sf::RenderWindow& window, GameConfig& config) {
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
         return;
+    }
+    
+    // Cargar fondo del menú
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
     }
     
     sf::Text titleText(font);
@@ -449,6 +476,13 @@ void showSettings(sf::RenderWindow& window, GameConfig& config) {
         sfxLabel.setFillColor(selectedSetting == 1 ? sf::Color::Cyan : sf::Color::White);
         
         window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        // Overlay semi-transparente
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 120));
+        window.draw(overlay);
+        
         window.draw(titleText);
         window.draw(musicLabel);
         window.draw(sfxLabel);
@@ -462,6 +496,16 @@ void showHighScores(sf::RenderWindow& window, const GameConfig& config) {
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
         return;
+    }
+    
+    // Cargar fondo del menú
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
     }
     
     sf::Text titleText(font);
@@ -529,6 +573,13 @@ void showHighScores(sf::RenderWindow& window, const GameConfig& config) {
         }
         
         window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        // Overlay semi-transparente
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 120));
+        window.draw(overlay);
+        
         window.draw(titleText);
         for (auto& text : scoreTexts) {
             window.draw(text);
@@ -543,6 +594,16 @@ std::string showGameOver(sf::RenderWindow& window, int finalScore, GameDifficult
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
         return "Player";
+    }
+    
+    // Cargar fondo del menú
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
     }
     
     sf::Text titleText(font);
@@ -619,6 +680,13 @@ std::string showGameOver(sf::RenderWindow& window, int finalScore, GameDifficult
         nameInputText.setString(playerName + "_");
         
         window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        // Overlay semi-transparente más oscuro para mejor contraste
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 150));
+        window.draw(overlay);
+        
         window.draw(titleText);
         window.draw(scoreText);
         window.draw(promptText);

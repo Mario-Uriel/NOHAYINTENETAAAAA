@@ -30,11 +30,22 @@ enum class MenuState {
     PLAYING
 };
 
+// Estructura para guardar récords con nombre de jugador
+struct HighScoreEntry {
+    std::string playerName;
+    int score;
+    std::string difficulty;
+    
+    HighScoreEntry() : playerName(""), score(0), difficulty("Normal") {}
+    HighScoreEntry(const std::string& name, int s, const std::string& diff) 
+        : playerName(name), score(s), difficulty(diff) {}
+};
+
 // Estructura de configuración global
 struct GameConfig {
     float musicVolume = 50.0f;
     float sfxVolume = 50.0f;
-    int globalHighScore = 0;
+    std::vector<HighScoreEntry> highScores;
 };
 
 // Estructura para almacenar información de personajes
@@ -51,7 +62,13 @@ void saveConfig(const GameConfig& config) {
     if (file.is_open()) {
         file << config.musicVolume << "\n";
         file << config.sfxVolume << "\n";
-        file << config.globalHighScore << "\n";
+        file << config.highScores.size() << "\n";
+        
+        for (const auto& entry : config.highScores) {
+            file << entry.playerName << "\n";
+            file << entry.score << "\n";
+            file << entry.difficulty << "\n";
+        }
         file.close();
     }
 }
@@ -61,9 +78,51 @@ void loadConfig(GameConfig& config) {
     if (file.is_open()) {
         file >> config.musicVolume;
         file >> config.sfxVolume;
-        file >> config.globalHighScore;
+        
+        size_t numScores;
+        file >> numScores;
+        file.ignore();
+        
+        config.highScores.clear();
+        for (size_t i = 0; i < numScores; ++i) {
+            HighScoreEntry entry;
+            std::getline(file, entry.playerName);
+            file >> entry.score;
+            file.ignore();
+            std::getline(file, entry.difficulty);
+            config.highScores.push_back(entry);
+        }
         file.close();
     }
+}
+
+// Función para agregar récord con nombre
+void addHighScore(GameConfig& config, const std::string& playerName, int score, GameDifficulty difficulty) {
+    std::string diffStr;
+    switch (difficulty) {
+        case GameDifficulty::EASY:
+            diffStr = "Facil";
+            break;
+        case GameDifficulty::NORMAL:
+            diffStr = "Normal";
+            break;
+        case GameDifficulty::HARD:
+            diffStr = "Dificil";
+            break;
+    }
+    
+    config.highScores.push_back(HighScoreEntry(playerName, score, diffStr));
+    
+    std::sort(config.highScores.begin(), config.highScores.end(),
+              [](const HighScoreEntry& a, const HighScoreEntry& b) {
+                  return a.score > b.score;
+              });
+    
+    if (config.highScores.size() > 10) {
+        config.highScores.resize(10);
+    }
+    
+    saveConfig(config);
 }
 
 class Projectile {
@@ -659,23 +718,64 @@ void showHighScores(sf::RenderWindow& window, const GameConfig& config) {
         return;
     }
     
+    // Cargar fondo
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+    }
+    
     sf::Text titleText(font);
-    titleText.setString("REGISTRO DE RECORD");
+    titleText.setString("REGISTRO DE RECORD - TOP 10");
     titleText.setCharacterSize(40);
     titleText.setFillColor(sf::Color::Yellow);
-    titleText.setPosition(sf::Vector2f(280, 150));
+    titleText.setPosition(sf::Vector2f(200, 50));
     
-    sf::Text scoreText(font);
-    scoreText.setString("Puntuacion Maxima Global: " + std::to_string(config.globalHighScore));
-    scoreText.setCharacterSize(30);
-    scoreText.setFillColor(sf::Color::White);
-    scoreText.setPosition(sf::Vector2f(200, 300));
+    std::vector<sf::Text> scoreTexts;
+    
+    if (config.highScores.empty()) {
+        sf::Text emptyText(font);
+        emptyText.setString("No hay records registrados aun");
+        emptyText.setCharacterSize(25);
+        emptyText.setFillColor(sf::Color::White);
+        emptyText.setPosition(sf::Vector2f(280, 280));
+        scoreTexts.push_back(emptyText);
+    } else {
+        for (size_t i = 0; i < config.highScores.size() && i < 10; ++i) {
+            const auto& entry = config.highScores[i];
+            
+            std::string scoreStr = std::to_string(i + 1) + ". " + 
+                                  entry.playerName + " - " + 
+                                  std::to_string(entry.score) + " pts (" + 
+                                  entry.difficulty + ")";
+            
+            sf::Text text(font);
+            text.setString(scoreStr);
+            text.setCharacterSize(22);
+            
+            if (i == 0) {
+                text.setFillColor(sf::Color(255, 215, 0));
+            } else if (i == 1) {
+                text.setFillColor(sf::Color(192, 192, 192));
+            } else if (i == 2) {
+                text.setFillColor(sf::Color(205, 127, 50));
+            } else {
+                text.setFillColor(sf::Color::White);
+            }
+            
+            text.setPosition(sf::Vector2f(120, 140 + i * 35));
+            scoreTexts.push_back(text);
+        }
+    }
     
     sf::Text backText(font);
     backText.setString("Presiona ESC para volver");
     backText.setCharacterSize(20);
     backText.setFillColor(sf::Color(200, 200, 200));
-    backText.setPosition(sf::Vector2f(320, 450));
+    backText.setPosition(sf::Vector2f(320, 540));
     
     while (window.isOpen()) {
         while (const auto event = window.pollEvent()) {
@@ -692,22 +792,264 @@ void showHighScores(sf::RenderWindow& window, const GameConfig& config) {
         }
         
         window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 120));
+        window.draw(overlay);
+        
         window.draw(titleText);
-        window.draw(scoreText);
+        for (auto& text : scoreTexts) {
+            window.draw(text);
+        }
         window.draw(backText);
         window.display();
     }
 }
 
+// Estructura para retornar opciones de game over
+struct GameOverResult {
+    std::string playerName;
+    int choice; // 0=Reintentar, 1=Ver Records, 2=Menu, -1=ESC sin guardar
+};
+
+// Declaración anticipada
+GameOverResult showPostGameMenu(sf::RenderWindow& window, const std::string& playerName, int finalScore);
+
+// Pantalla de Game Over con input de nombre
+GameOverResult showGameOver(sf::RenderWindow& window, int finalScore, GameDifficulty difficulty) {
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return {"Player", -1};
+    }
+    
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+    }
+    
+    sf::Text titleText(font);
+    titleText.setString("GAME OVER");
+    titleText.setCharacterSize(60);
+    titleText.setFillColor(sf::Color::Red);
+    titleText.setOutlineColor(sf::Color::Black);
+    titleText.setOutlineThickness(3);
+    titleText.setPosition(sf::Vector2f(320, 100));
+    
+    sf::Text scoreText(font);
+    scoreText.setString("Puntuacion Final: " + std::to_string(finalScore));
+    scoreText.setCharacterSize(35);
+    scoreText.setFillColor(sf::Color::Yellow);
+    scoreText.setPosition(sf::Vector2f(250, 220));
+    
+    sf::Text promptText(font);
+    promptText.setString("Ingresa tu nombre:");
+    promptText.setCharacterSize(28);
+    promptText.setFillColor(sf::Color::White);
+    promptText.setPosition(sf::Vector2f(330, 300));
+    
+    std::string playerName = "";
+    sf::Text nameInputText(font);
+    nameInputText.setCharacterSize(30);
+    nameInputText.setFillColor(sf::Color::Cyan);
+    nameInputText.setPosition(sf::Vector2f(350, 350));
+    
+    sf::Text instructionText(font);
+    instructionText.setString("Escribe tu nombre y presiona ENTER (max 15 caracteres)");
+    instructionText.setCharacterSize(18);
+    instructionText.setFillColor(sf::Color(200, 200, 200));
+    instructionText.setPosition(sf::Vector2f(180, 450));
+    
+    sf::Text skipText(font);
+    skipText.setString("R: Reintentar | ESC: Menu");
+    skipText.setCharacterSize(16);
+    skipText.setFillColor(sf::Color(150, 150, 150));
+    skipText.setPosition(sf::Vector2f(360, 500));
+    
+    bool nameEntered = false;
+    
+    while (window.isOpen() && !nameEntered) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return {"Player", -1};
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Enter && !playerName.empty()) {
+                    nameEntered = true;
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Escape) {
+                    return {"", -1};
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Backspace && !playerName.empty()) {
+                    playerName.pop_back();
+                }
+            }
+            
+            if (const auto* textEntered = event->getIf<sf::Event::TextEntered>()) {
+                if (textEntered->unicode < 128 && playerName.length() < 15) {
+                    char typed = static_cast<char>(textEntered->unicode);
+                    if ((typed >= 'a' && typed <= 'z') || 
+                        (typed >= 'A' && typed <= 'Z') || 
+                        (typed >= '0' && typed <= '9') || 
+                        typed == ' ') {
+                        playerName += typed;
+                    }
+                }
+            }
+        }
+        
+        nameInputText.setString(playerName + "_");
+        
+        window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 150));
+        window.draw(overlay);
+        
+        window.draw(titleText);
+        window.draw(scoreText);
+        window.draw(promptText);
+        window.draw(nameInputText);
+        window.draw(instructionText);
+        window.draw(skipText);
+        window.display();
+    }
+    
+    // Ahora mostrar opciones después de guardar
+    return showPostGameMenu(window, playerName.empty() ? "Anonimo" : playerName, finalScore);
+}
+
+// Menú después de registrar el nombre
+GameOverResult showPostGameMenu(sf::RenderWindow& window, const std::string& playerName, int finalScore) {
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return {playerName, 2};
+    }
+    
+    sf::Texture bgTexture;
+    bool hasBackground = bgTexture.loadFromFile("assets/images/Menu principal.png");
+    sf::Sprite bgSprite(bgTexture);
+    if (hasBackground) {
+        float scaleX = static_cast<float>(WINDOW_WIDTH) / bgTexture.getSize().x;
+        float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgTexture.getSize().y;
+        bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+    }
+    
+    sf::Text titleText(font);
+    titleText.setString("RECORD GUARDADO!");
+    titleText.setCharacterSize(50);
+    titleText.setFillColor(sf::Color::Yellow);
+    titleText.setOutlineColor(sf::Color::Black);
+    titleText.setOutlineThickness(3);
+    titleText.setPosition(sf::Vector2f(250, 100));
+    
+    sf::Text nameText(font);
+    nameText.setString("Jugador: " + playerName);
+    nameText.setCharacterSize(30);
+    nameText.setFillColor(sf::Color::White);
+    nameText.setPosition(sf::Vector2f(350, 200));
+    
+    sf::Text scoreText(font);
+    scoreText.setString("Puntuacion: " + std::to_string(finalScore));
+    scoreText.setCharacterSize(30);
+    scoreText.setFillColor(sf::Color::Cyan);
+    scoreText.setPosition(sf::Vector2f(330, 250));
+    
+    std::vector<std::string> options = {
+        "1. Reintentar",
+        "2. Ver Records",
+        "3. Menu Principal"
+    };
+    
+    std::vector<sf::Text> optionTexts;
+    int selectedOption = 0;
+    
+    for (size_t i = 0; i < options.size(); ++i) {
+        sf::Text text(font);
+        text.setString(options[i]);
+        text.setCharacterSize(28);
+        text.setFillColor(i == 0 ? sf::Color::Cyan : sf::Color::White);
+        text.setPosition(sf::Vector2f(350, 350 + i * 60));
+        optionTexts.push_back(text);
+    }
+    
+    sf::Text instructionText(font);
+    instructionText.setString("Usa FLECHAS o numeros, ENTER para confirmar");
+    instructionText.setCharacterSize(18);
+    instructionText.setFillColor(sf::Color(200, 200, 200));
+    instructionText.setPosition(sf::Vector2f(250, 530));
+    
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return {playerName, 2};
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Up) {
+                    selectedOption = (selectedOption - 1 + 3) % 3;
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Down) {
+                    selectedOption = (selectedOption + 1) % 3;
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Num1) {
+                    return {playerName, 0};
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Num2) {
+                    return {playerName, 1};
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Num3) {
+                    return {playerName, 2};
+                }
+                else if (keyPressed->code == sf::Keyboard::Key::Enter) {
+                    return {playerName, selectedOption};
+                }
+            }
+        }
+        
+        // Actualizar colores de selección
+        for (size_t i = 0; i < optionTexts.size(); ++i) {
+            if (i == selectedOption) {
+                optionTexts[i].setFillColor(sf::Color::Cyan);
+                optionTexts[i].setOutlineColor(sf::Color::Black);
+                optionTexts[i].setOutlineThickness(2);
+            } else {
+                optionTexts[i].setFillColor(sf::Color::White);
+                optionTexts[i].setOutlineThickness(0);
+            }
+        }
+        
+        window.clear(sf::Color(20, 20, 40));
+        window.draw(bgSprite);
+        
+        sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+        overlay.setFillColor(sf::Color(0, 0, 0, 150));
+        window.draw(overlay);
+        
+        window.draw(titleText);
+        window.draw(nameText);
+        window.draw(scoreText);
+        for (auto& text : optionTexts) {
+            window.draw(text);
+        }
+        window.draw(instructionText);
+        window.display();
+    }
+    
+    return {playerName, 2};
+}
+
 // Función para mostrar el menú de selección de personaje
 int showCharacterSelection(sf::RenderWindow& window) {
-    // Cargar y reproducir música de selección
-    sf::Music selectionMusic;
-    if (!selectionMusic.openFromFile("assets/music/Selecciona-tu-personaje.ogg")) {
-        return 0; // Error cargando música
-    }
-    selectionMusic.setLooping(true);
-    selectionMusic.play();
+    // La música del menú principal sigue sonando durante la selección de personaje
     
     // Cargar fondo principal
     sf::Texture backgroundTexture;
@@ -879,9 +1221,6 @@ int showCharacterSelection(sf::RenderWindow& window) {
         
         window.display();
     }
-    
-    // Detener la música de selección al salir del menú
-    selectionMusic.stop();
     
     return selectedCharacter;
 }
@@ -1110,7 +1449,7 @@ START_GAME:
 
     int score = 0;
     int lives = 3;
-    int highScore = gameConfig.globalHighScore; // Cargar marcador de puntuación máxima global
+    int highScore = gameConfig.highScores.empty() ? 0 : gameConfig.highScores[0].score;
 
     sf::Font font;
     if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
@@ -1142,11 +1481,27 @@ START_GAME:
     debugText.setFillColor(sf::Color::Cyan);
 
     bool gameOver = false;
+    bool isPaused = false;
+    
     sf::Text gameOverText(font);
-    gameOverText.setString("GAME OVER - R: Reiniciar | ESC: Menu");
-    gameOverText.setCharacterSize(30);
-    gameOverText.setPosition(sf::Vector2f(200, WINDOW_HEIGHT / 2));
+    gameOverText.setString("GAME OVER - Presiona R para registrar tu record");
+    gameOverText.setCharacterSize(26);
+    gameOverText.setPosition(sf::Vector2f(150, WINDOW_HEIGHT / 2));
     gameOverText.setFillColor(sf::Color::Red);
+    
+    sf::Text pauseText(font);
+    pauseText.setString("PAUSA");
+    pauseText.setCharacterSize(60);
+    pauseText.setFillColor(sf::Color::Yellow);
+    pauseText.setOutlineColor(sf::Color::Black);
+    pauseText.setOutlineThickness(3);
+    pauseText.setPosition(sf::Vector2f(380, 200));
+    
+    sf::Text pauseOptionsText(font);
+    pauseOptionsText.setString("P o ESC: Continuar | M: Menu Principal");
+    pauseOptionsText.setCharacterSize(22);
+    pauseOptionsText.setFillColor(sf::Color::White);
+    pauseOptionsText.setPosition(sf::Vector2f(220, 320));
 
     while (window.isOpen()) {
         while (const auto event = window.pollEvent()) {
@@ -1155,56 +1510,82 @@ START_GAME:
             }
 
             if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                if (keyPressed->code == sf::Keyboard::Key::Space && !gameOver) {
+                // Pausa con P o ESC (solo si no está en game over)
+                if ((keyPressed->code == sf::Keyboard::Key::P || keyPressed->code == sf::Keyboard::Key::Escape) && !gameOver) {
+                    isPaused = !isPaused;
+                    if (isPaused) {
+                        // Pausar música
+                        if (currentMusic == 1) gameMusic1.pause();
+                        else gameMusic2.pause();
+                        if (isShooting) shootSound.pause();
+                    } else {
+                        // Reanudar música
+                        if (currentMusic == 1) gameMusic1.play();
+                        else gameMusic2.play();
+                        if (isShooting) shootSound.play();
+                    }
+                }
+                
+                // Volver al menú desde pausa
+                if (keyPressed->code == sf::Keyboard::Key::M && isPaused && !gameOver) {
+                    gameMusic1.stop();
+                    gameMusic2.stop();
+                    shootSound.stop();
+                    isShooting = false;
+                    currentState = MenuState::MAIN_MENU;
+                    shouldExit = true;
+                }
+                
+                if (keyPressed->code == sf::Keyboard::Key::Space && !gameOver && !isPaused) {
                     dino.jump();
                 }
                 if (keyPressed->code == sf::Keyboard::Key::R && gameOver) {
+                    // Pedir nombre del jugador y mostrar opciones
+                    GameOverResult result = showGameOver(window, score, difficulty);
+                    
+                    // Guardar récord si ingresó nombre
+                    if (!result.playerName.empty() && result.choice != -1) {
+                        addHighScore(gameConfig, result.playerName, score, difficulty);
+                    }
+                    
                     // Detener músicas y sonidos del juego
                     gameMusic1.stop();
                     gameMusic2.stop();
                     shootSound.stop();
                     isShooting = false;
                     
-                    // Reiniciar juego - volver a mostrar selección
-                    selectedCharacter = showCharacterSelection(window);
-                    if (selectedCharacter == -1) {
-                        window.close();
-                        return 0;
+                    // Manejar la opción elegida
+                    if (result.choice == 0) {
+                        // REINTENTAR - Reiniciar juego con mismo personaje y dificultad
+                        dino = Dino(100, playerGroundY, &characterTexture, numFrames, shootCooldown);
+                        enemies.clear();
+                        projectiles.clear();
+                        explosions.clear();
+                        score = 0;
+                        lives = 3;
+                        gameOver = false;
+                        enemySpawnClock.restart();
+                        lastEnemyType = -1;
+                        consecutiveTrucks = 0;
+                        spawnInterval = 2.0f;
+                        
+                        // Reiniciar música del juego
+                        gameMusic1.stop();
+                        gameMusic2.stop();
+                        gameMusic1.play();
+                        currentMusic = 1;
                     }
-                    
-                    // Recargar textura seleccionada
-                    if (selectedCharacter == 0) {
-                        characterTexture.loadFromFile("assets/images/PIKACHU (2) (1).png");
-                    } else {
-                        characterTexture.loadFromFile("assets/images/Ballesta .png");
+                    else if (result.choice == 1) {
+                        // VER RECORDS - Mostrar tabla de récords y volver al menú
+                        showHighScores(window, gameConfig);
+                        currentState = MenuState::MAIN_MENU;
+                        shouldExit = true;
                     }
-                    
-                    // Recargar sonido de disparo según el personaje
-                    shootSound.stop();
-                    if (selectedCharacter == 0) {
-                        shootSound.openFromFile("assets/music/AK-47.ogg");
-                    } else {
-                        shootSound.openFromFile("assets/music/Ballesta sonido.ogg");
+                    else {
+                        // MENU PRINCIPAL o ESC - Volver al menú
+                        currentState = MenuState::MAIN_MENU;
+                        shouldExit = true;
                     }
-                    shootSound.setLooping(true);
-                    
-                    dino = Dino(100, playerGroundY, &characterTexture, numFrames, shootCooldown);
-                    enemies.clear();
-                    projectiles.clear();
-                    explosions.clear();
-                    score = 0;
-                    lives = 3;
-                    gameOver = false;
-                    enemySpawnClock.restart();
-                    lastEnemyType = -1;
-                    consecutiveTrucks = 0;
-                    spawnInterval = 2.0f;
-                    
-                    // Reiniciar música del juego
-                    gameMusic1.stop();
-                    gameMusic2.stop();
-                    gameMusic1.play();
-                    currentMusic = 1;
                 }
                 if (keyPressed->code == sf::Keyboard::Key::Escape && gameOver) {
                     // Detener todas las músicas y sonidos del juego
@@ -1220,16 +1601,18 @@ START_GAME:
             }
         }
         
-        // Alternar entre las músicas del juego cuando una termina
-        if (currentMusic == 1 && gameMusic1.getStatus() != sf::Music::Status::Playing) {
-            gameMusic2.play();
-            currentMusic = 2;
-        } else if (currentMusic == 2 && gameMusic2.getStatus() != sf::Music::Status::Playing) {
-            gameMusic1.play();
-            currentMusic = 1;
+        // Alternar entre las músicas del juego cuando una termina (solo si no está en pausa)
+        if (!isPaused) {
+            if (currentMusic == 1 && gameMusic1.getStatus() != sf::Music::Status::Playing) {
+                gameMusic2.play();
+                currentMusic = 2;
+            } else if (currentMusic == 2 && gameMusic2.getStatus() != sf::Music::Status::Playing) {
+                gameMusic1.play();
+                currentMusic = 1;
+            }
         }
 
-        if (!gameOver) {
+        if (!gameOver && !isPaused) {
             // Controles de movimiento horizontal (A/D o Flechas Izquierda/Derecha)
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
                 dino.moveLeft();
@@ -1271,9 +1654,10 @@ START_GAME:
             dino.update(playerGroundY);
             
             // Aumentar velocidad del juego con el tiempo (cada 20 puntos)
-            if (score > 0 && score % 20 == 0 && gameSpeedMultiplier < 2.0f) {
-                gameSpeedMultiplier = 1.0f + (score / 100.0f);
-            }
+            // La velocidad aumenta gradualmente pero respeta el multiplicador base de dificultad
+            float progressMultiplier = 1.0f + (score / 100.0f);
+            if (progressMultiplier > 2.0f) progressMultiplier = 2.0f; // Límite máximo de 2x
+            gameSpeedMultiplier = difficultySpeedMultiplier * progressMultiplier;
 
             // Mover fondo con velocidad aumentada
             background1.move(sf::Vector2f(-backgroundSpeed * gameSpeedMultiplier, 0));
@@ -1390,12 +1774,6 @@ START_GAME:
             if (score > highScore) {
                 highScore = score;
                 highScoreText.setString("High Score: " + std::to_string(highScore));
-                
-                // Actualizar el high score global
-                if (score > gameConfig.globalHighScore) {
-                    gameConfig.globalHighScore = score;
-                    saveConfig(gameConfig);
-                }
             }
         }
 
@@ -1427,6 +1805,16 @@ START_GAME:
         
         if (gameOver) {
             window.draw(gameOverText);
+        }
+        
+        if (isPaused) {
+            // Overlay semi-transparente
+            sf::RectangleShape pauseOverlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+            pauseOverlay.setFillColor(sf::Color(0, 0, 0, 150));
+            window.draw(pauseOverlay);
+            
+            window.draw(pauseText);
+            window.draw(pauseOptionsText);
         }
         
         window.display();
