@@ -8,8 +8,8 @@
 const int WINDOW_WIDTH = 1000;
 const int WINDOW_HEIGHT = 600;
 const int GROUND_HEIGHT = 50;
-const float GRAVITY = 0.5f;
-const float JUMP_STRENGTH = -12.0f;
+const float GRAVITY = 0.4f;
+const float JUMP_STRENGTH = -15.0f;
 
 // Estructura para almacenar información de personajes
 struct CharacterInfo {
@@ -142,7 +142,7 @@ public:
     void update(float groundY) {
         if (isJumping) {
             if (isDucking) {
-                velocityY += GRAVITY * 2.5f;
+                velocityY += GRAVITY * 4.0f; // Caída más rápida al presionar abajo
             } else {
                 velocityY += GRAVITY;
             }
@@ -267,26 +267,23 @@ public:
 
     Enemy(float startX, float groundY, int enemyType) {
         x = startX;
-        type = enemyType;
+        type = 0; // Solo cactus terrestres
         active = true;
         speed = 3.0f + (rand() % 3) * 0.5f;
 
-        if (type == 0) {
-            shape.setSize(sf::Vector2f(30, 50));
-            shape.setFillColor(sf::Color(34, 139, 34));
-            y = groundY;
-        } else {
-            shape.setSize(sf::Vector2f(40, 30));
-            shape.setFillColor(sf::Color(105, 105, 105));
-            int heightOptions[] = {-70, -100, -130};
-            y = groundY + heightOptions[rand() % 3];
-        }
+        // Cactus con altura aleatoria entre 60 y 100 píxeles
+        int randomHeight = 60 + (rand() % 41); // 60 a 100
+        int randomWidth = 30 + (rand() % 21);   // 30 a 50
+        
+        shape.setSize(sf::Vector2f(randomWidth, randomHeight));
+        shape.setFillColor(sf::Color(34, 139, 34));
+        y = groundY;
 
         shape.setPosition(sf::Vector2f(x, y - shape.getSize().y));
     }
 
-    void update() {
-        x -= speed;
+    void update(float speedMultiplier = 1.0f) {
+        x -= speed * speedMultiplier;
         shape.setPosition(sf::Vector2f(x, y - shape.getSize().y));
 
         if (x < -100) {
@@ -478,9 +475,12 @@ int main() {
 
     // Calcular posición del suelo - personajes tocan el borde del suelo
     float groundY = WINDOW_HEIGHT - GROUND_HEIGHT;
+    
+    // Ajustar posición del personaje más abajo
+    float playerGroundY = groundY + 70;
 
     // Crear personaje con la textura seleccionada
-    Dino dino(100, groundY, &characterTexture, numFrames);
+    Dino dino(100, playerGroundY, &characterTexture, numFrames);
 
     // Cargar fondo
     sf::Texture backgroundTexture;
@@ -499,7 +499,8 @@ int main() {
     
     // Posicionar el segundo fondo para scroll continuo
     background2.setPosition(sf::Vector2f(bgSize.x * scaleX, 0));
-    float backgroundSpeed = 1.5f;
+    float backgroundSpeed = 2.0f;
+    float gameSpeedMultiplier = 1.0f;
 
     // Suelo
     sf::RectangleShape ground(sf::Vector2f(WINDOW_WIDTH, GROUND_HEIGHT));
@@ -565,7 +566,7 @@ int main() {
                         characterTexture.loadFromFile("assets/images/Ballesta .png");
                     }
                     
-                    dino = Dino(100, groundY, &characterTexture, numFrames);
+                    dino = Dino(100, playerGroundY, &characterTexture, numFrames);
                     enemies.clear();
                     projectiles.clear();
                     explosions.clear();
@@ -594,12 +595,17 @@ int main() {
                 dino.resetShootClock();
             }
 
-            // Actualizar personaje
-            dino.update(groundY);
+            // Actualizar personaje con su posición de suelo ajustada
+            dino.update(playerGroundY);
+            
+            // Aumentar velocidad del juego con el tiempo (cada 20 puntos)
+            if (score > 0 && score % 20 == 0 && gameSpeedMultiplier < 2.0f) {
+                gameSpeedMultiplier = 1.0f + (score / 100.0f);
+            }
 
-            // Mover fondo
-            background1.move(sf::Vector2f(-backgroundSpeed, 0));
-            background2.move(sf::Vector2f(-backgroundSpeed, 0));
+            // Mover fondo con velocidad aumentada
+            background1.move(sf::Vector2f(-backgroundSpeed * gameSpeedMultiplier, 0));
+            background2.move(sf::Vector2f(-backgroundSpeed * gameSpeedMultiplier, 0));
             
             // Usar el ancho escalado del fondo para el scroll
             float scaledBgWidth = backgroundTexture.getSize().x * background1.getScale().x;
@@ -610,20 +616,19 @@ int main() {
                 background2.setPosition(sf::Vector2f(background1.getPosition().x + scaledBgWidth, 0));
             }
 
-            // Spawn enemigos
-            if (enemySpawnClock.getElapsedTime().asSeconds() > spawnInterval) {
-                int enemyType = rand() % 2;
-                enemies.push_back(Enemy(WINDOW_WIDTH, groundY, enemyType));
+            // Spawn enemigos - solo cactus terrestres con aparición más rápida
+            if (enemySpawnClock.getElapsedTime().asSeconds() > (spawnInterval / gameSpeedMultiplier)) {
+                enemies.push_back(Enemy(WINDOW_WIDTH, groundY, 0));
                 enemySpawnClock.restart();
                 
-                if (score > 0 && score % 10 == 0 && spawnInterval > 0.8f) {
-                    spawnInterval -= 0.1f;
+                if (score > 0 && score % 10 == 0 && spawnInterval > 1.0f) {
+                    spawnInterval -= 0.05f; // Reducción más gradual
                 }
             }
 
-            // Actualizar enemigos
+            // Actualizar enemigos con velocidad aumentada
             for (auto& enemy : enemies) {
-                enemy.update();
+                enemy.update(gameSpeedMultiplier);
             }
 
             // Actualizar proyectiles
