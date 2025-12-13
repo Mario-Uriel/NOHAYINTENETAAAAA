@@ -1249,19 +1249,24 @@ int main() {
     int selectedCharacter = -1;
     bool shouldExit = false;
 
-    // Bucle principal del juego
-    while (window.isOpen() && !shouldExit) {
+    // Bucle principal del menú
+CONTINUE_MENU_LOOP:
+    while (window.isOpen()) {
         switch (currentState) {
             case MenuState::MAIN_MENU: {
                 currentState = showMainMenu(window, menuMusic, gameConfig);
-                if (!window.isOpen()) shouldExit = true;
+                if (!window.isOpen()) {
+                    saveConfig(gameConfig);
+                    return 0;
+                }
                 break;
             }
             
             case MenuState::DIFFICULTY_SELECT: {
                 difficulty = showDifficultySelect(window);
                 if (!window.isOpen()) {
-                    shouldExit = true;
+                    saveConfig(gameConfig);
+                    return 0;
                 } else {
                     currentState = MenuState::CHARACTER_SELECT;
                 }
@@ -1271,7 +1276,8 @@ int main() {
             case MenuState::CHARACTER_SELECT: {
                 selectedCharacter = showCharacterSelection(window);
                 if (selectedCharacter == -1 || !window.isOpen()) {
-                    shouldExit = true;
+                    saveConfig(gameConfig);
+                    return 0;
                 } else {
                     currentState = MenuState::PLAYING;
                 }
@@ -1281,9 +1287,9 @@ int main() {
             case MenuState::SETTINGS: {
                 showSettings(window, gameConfig);
                 if (!window.isOpen()) {
-                    shouldExit = true;
+                    saveConfig(gameConfig);
+                    return 0;
                 } else {
-                    // Actualizar volumen de la música del menú
                     menuMusic.setVolume(gameConfig.musicVolume);
                     currentState = MenuState::MAIN_MENU;
                 }
@@ -1293,7 +1299,8 @@ int main() {
             case MenuState::HIGH_SCORES: {
                 showHighScores(window, gameConfig);
                 if (!window.isOpen()) {
-                    shouldExit = true;
+                    saveConfig(gameConfig);
+                    return 0;
                 } else {
                     currentState = MenuState::MAIN_MENU;
                 }
@@ -1301,11 +1308,7 @@ int main() {
             }
             
             case MenuState::PLAYING: {
-                // Detener música del menú
                 menuMusic.stop();
-                
-                // Iniciar el juego con la dificultad y personaje seleccionados
-                // (El código del juego va aquí)
                 goto START_GAME;
             }
         }
@@ -1532,8 +1535,7 @@ START_GAME:
                     gameMusic2.stop();
                     shootSound.stop();
                     isShooting = false;
-                    currentState = MenuState::MAIN_MENU;
-                    shouldExit = true;
+                    goto EXIT_GAME_LOOP;
                 }
                 
                 if (keyPressed->code == sf::Keyboard::Key::Space && !gameOver && !isPaused) {
@@ -1578,13 +1580,12 @@ START_GAME:
                     else if (result.choice == 1) {
                         // VER RECORDS - Mostrar tabla de récords y volver al menú
                         showHighScores(window, gameConfig);
-                        currentState = MenuState::MAIN_MENU;
-                        shouldExit = true;
+                        // Salir del loop del juego para volver al menú
+                        goto EXIT_GAME_LOOP;
                     }
                     else {
                         // MENU PRINCIPAL o ESC - Volver al menú
-                        currentState = MenuState::MAIN_MENU;
-                        shouldExit = true;
+                        goto EXIT_GAME_LOOP;
                     }
                 }
                 if (keyPressed->code == sf::Keyboard::Key::Escape && gameOver) {
@@ -1595,8 +1596,7 @@ START_GAME:
                     isShooting = false;
                     
                     // Volver al menú principal
-                    currentState = MenuState::MAIN_MENU;
-                    shouldExit = true; // Salir del loop del juego para volver al loop del menú
+                    goto EXIT_GAME_LOOP;
                 }
             }
         }
@@ -1820,5 +1820,15 @@ START_GAME:
         window.display();
     }
 
-    return 0;
+EXIT_GAME_LOOP:
+    // Reiniciar la música del menú al volver
+    if (window.isOpen()) {
+        menuMusic.play();
+        currentState = MenuState::MAIN_MENU;
+        // Continuar en el bucle principal del menú
+        goto CONTINUE_MENU_LOOP;
+    } else {
+        saveConfig(gameConfig);
+        return 0;
+    }
 }
