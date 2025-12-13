@@ -76,19 +76,24 @@ void saveConfig(const GameConfig& config) {
 void loadConfig(GameConfig& config) {
     std::ifstream file("game_config.dat");
     if (file.is_open()) {
-        file >> config.musicVolume;
-        file >> config.sfxVolume;
+        std::string line;
         
-        size_t numScores;
-        file >> numScores;
-        file.ignore();
+        // Leer volúmenes
+        std::getline(file, line);
+        config.musicVolume = std::stof(line);
+        std::getline(file, line);
+        config.sfxVolume = std::stof(line);
+        
+        // Leer número de scores
+        std::getline(file, line);
+        size_t numScores = std::stoi(line);
         
         config.highScores.clear();
         for (size_t i = 0; i < numScores; ++i) {
             HighScoreEntry entry;
             std::getline(file, entry.playerName);
-            file >> entry.score;
-            file.ignore();
+            std::getline(file, line);
+            entry.score = std::stoi(line);
             std::getline(file, entry.difficulty);
             config.highScores.push_back(entry);
         }
@@ -736,39 +741,36 @@ void showHighScores(sf::RenderWindow& window, const GameConfig& config) {
     
     std::vector<sf::Text> scoreTexts;
     
-    if (config.highScores.empty()) {
-        sf::Text emptyText(font);
-        emptyText.setString("No hay records registrados aun");
-        emptyText.setCharacterSize(25);
-        emptyText.setFillColor(sf::Color::White);
-        emptyText.setPosition(sf::Vector2f(280, 280));
-        scoreTexts.push_back(emptyText);
-    } else {
-        for (size_t i = 0; i < config.highScores.size() && i < 10; ++i) {
+    // Mostrar siempre 10 lugares
+    for (size_t i = 0; i < 10; ++i) {
+        std::string scoreStr;
+        
+        if (i < config.highScores.size()) {
             const auto& entry = config.highScores[i];
-            
-            std::string scoreStr = std::to_string(i + 1) + ". " + 
-                                  entry.playerName + " - " + 
-                                  std::to_string(entry.score) + " pts (" + 
-                                  entry.difficulty + ")";
-            
-            sf::Text text(font);
-            text.setString(scoreStr);
-            text.setCharacterSize(22);
-            
-            if (i == 0) {
-                text.setFillColor(sf::Color(255, 215, 0));
-            } else if (i == 1) {
-                text.setFillColor(sf::Color(192, 192, 192));
-            } else if (i == 2) {
-                text.setFillColor(sf::Color(205, 127, 50));
-            } else {
-                text.setFillColor(sf::Color::White);
-            }
-            
-            text.setPosition(sf::Vector2f(120, 140 + i * 35));
-            scoreTexts.push_back(text);
+            scoreStr = std::to_string(i + 1) + ". " + 
+                      entry.playerName + " - " + 
+                      std::to_string(entry.score) + " pts (" + 
+                      entry.difficulty + ")";
+        } else {
+            scoreStr = std::to_string(i + 1) + ". ---";
         }
+        
+        sf::Text text(font);
+        text.setString(scoreStr);
+        text.setCharacterSize(22);
+        
+        if (i == 0) {
+            text.setFillColor(sf::Color(255, 215, 0));
+        } else if (i == 1) {
+            text.setFillColor(sf::Color(192, 192, 192));
+        } else if (i == 2) {
+            text.setFillColor(sf::Color(205, 127, 50));
+        } else {
+            text.setFillColor(sf::Color::White);
+        }
+        
+        text.setPosition(sf::Vector2f(120, 140 + i * 35));
+        scoreTexts.push_back(text);
     }
     
     sf::Text backText(font);
