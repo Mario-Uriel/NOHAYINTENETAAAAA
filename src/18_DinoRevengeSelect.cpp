@@ -342,6 +342,28 @@ public:
 
 // Función para mostrar el menú de selección de personaje
 int showCharacterSelection(sf::RenderWindow& window) {
+    // Cargar fondo principal
+    sf::Texture backgroundTexture;
+    if (!backgroundTexture.loadFromFile("assets/images/Fondo principal.png")) {
+        return 0; // Error cargando fondo
+    }
+    sf::Sprite backgroundSprite(backgroundTexture);
+    
+    // Escalar el fondo para que cubra toda la ventana sin distorsión
+    sf::Vector2u bgSize = backgroundTexture.getSize();
+    float scaleX = static_cast<float>(WINDOW_WIDTH) / bgSize.x;
+    float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgSize.y;
+    float scale = std::max(scaleX, scaleY); // Usar el mayor para cubrir toda la ventana
+    backgroundSprite.setScale(sf::Vector2f(scale, scale));
+    
+    // Centrar el fondo si es necesario
+    float bgWidth = bgSize.x * scale;
+    float bgHeight = bgSize.y * scale;
+    backgroundSprite.setPosition(sf::Vector2f(
+        (WINDOW_WIDTH - bgWidth) / 2.0f,
+        (WINDOW_HEIGHT - bgHeight) / 2.0f
+    ));
+    
     // Cargar personajes
     CharacterInfo pika, ballesta;
     
@@ -422,6 +444,10 @@ int showCharacterSelection(sf::RenderWindow& window) {
     ballestaFrame.setOutlineThickness(5);
     ballestaFrame.setPosition(sf::Vector2f(590, 240));
     
+    // Overlay semitransparente para mejorar la legibilidad
+    sf::RectangleShape overlay(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    overlay.setFillColor(sf::Color(0, 0, 0, 120)); // Negro con 47% de opacidad
+    
     int selectedCharacter = -1;
     int hoveredCharacter = 0; // 0 = pika, 1 = ballesta
     
@@ -459,7 +485,13 @@ int showCharacterSelection(sf::RenderWindow& window) {
         }
         
         // Dibujar
-        window.clear(sf::Color(20, 20, 40));
+        window.clear();
+        
+        // Dibujar fondo principal
+        window.draw(backgroundSprite);
+        
+        // Dibujar overlay semitransparente
+        window.draw(overlay);
         
         // Dibujar marcos de selección
         if (hoveredCharacter == 0) {
