@@ -4,7 +4,9 @@
 
 ### 🎯 Objetivo del Juego
 
-Sobrevive el mayor tiempo posible, elimina enemigos y alcanza el récord más alto. Cada enemigo derrotado suma puntos, pero ten cuidado: solo tienes 3 vidas. La velocidad del juego aumenta conforme avanzas, poniendo a prueba tus reflejos y habilidades.
+Sobrevive el mayor tiempo posible, elimina enemigos y alcanza el récord más alto. Cada enemigo derrotado suma puntos, pero ten c
+
+uidado: solo tienes 3 vidas. La velocidad del juego aumenta conforme avanzas, poniendo a prueba tus reflejos y habilidades.
 
 ### 🎮 Controles
 
