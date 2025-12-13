@@ -1,0 +1,713 @@
+#include <SFML/Graphics.hpp>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
+#include <cmath>
+
+const int WINDOW_WIDTH = 1000;
+const int WINDOW_HEIGHT = 600;
+const int GROUND_HEIGHT = 50;
+const float GRAVITY = 0.4f;
+const float JUMP_STRENGTH = -15.0f;
+
+// Estructura para almacenar información de personajes
+struct CharacterInfo {
+    std::string name;
+    std::string texturePath;
+    sf::Texture texture;
+    int numFrames;
+};
+
+class Projectile {
+public:
+    sf::CircleShape shape;
+    sf::CircleShape glow;
+    sf::Vector2f velocity;
+    bool active;
+    int direction;
+
+    Projectile(float x, float y, int dir) {
+        direction = dir;
+        shape.setRadius(6);
+        shape.setPosition(sf::Vector2f(x, y));
+        shape.setFillColor(sf::Color(255, 150, 0));
+        shape.setOutlineColor(sf::Color(255, 200, 0));
+        shape.setOutlineThickness(2);
+        
+        glow.setRadius(10);
+        glow.setPosition(sf::Vector2f(x - 4, y - 4));
+        glow.setFillColor(sf::Color(255, 100, 0, 100));
+        
+        velocity = sf::Vector2f(15.0f * direction, 0.0f);
+        active = true;
+    }
+
+    void update() {
+        shape.move(velocity);
+        glow.setPosition(sf::Vector2f(shape.getPosition().x - 4, shape.getPosition().y - 4));
+
+        if (shape.getPosition().x > WINDOW_WIDTH + 20 || 
+            shape.getPosition().x < -20 ||
+            shape.getPosition().y > WINDOW_HEIGHT) {
+            active = false;
+        }
+    }
+
+    void draw(sf::RenderWindow& window) {
+        if (active) {
+            window.draw(glow);
+            window.draw(shape);
+        }
+    }
+
+    sf::FloatRect getBounds() const {
+        return shape.getGlobalBounds();
+    }
+};
+
+class Dino {
+public:
+    sf::Texture* walkTexture;
+    sf::Sprite sprite;
+    float velocityY;
+    float x, y;
+    bool isJumping;
+    bool isDucking;
+    int animationFrame;
+    int facingDirection;
+    sf::Clock animationClock;
+    sf::Clock shootClock;
+    int numFrames;
+    float spriteScale;
+
+    Dino(float startX, float startY, sf::Texture* texture, int frames) : sprite(*texture) {
+        walkTexture = texture;
+        x = startX;
+        y = startY;
+        facingDirection = 1;
+        numFrames = frames;
+        spriteScale = 0.6f;
+        
+        sprite.setTexture(*walkTexture);
+        sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
+        
+        sf::Vector2u texSize = walkTexture->getSize();
+        int frameWidth = texSize.x / numFrames;
+        
+        // Recortar sprite: usar 60% desde más abajo (eliminar 15% arriba, 25% abajo)
+        int visibleHeight = static_cast<int>(texSize.y * 0.6f);
+        int offsetY = static_cast<int>(texSize.y * 0.15f);
+        
+        // Recortar también los lados si hay espacio extra
+        int visibleWidth = static_cast<int>(frameWidth * 0.8f);
+        int offsetX = static_cast<int>(frameWidth * 0.1f);
+        
+        sprite.setTextureRect(sf::IntRect(sf::Vector2i(offsetX, offsetY), sf::Vector2i(visibleWidth, visibleHeight)));
+        
+        // Origen en la base de la parte visible
+        sprite.setOrigin(sf::Vector2f(visibleWidth / 2.0f, visibleHeight));
+
+        velocityY = 0;
+        isJumping = false;
+        isDucking = false;
+        animationFrame = 0;
+    }
+
+    void jump() {
+        if (!isJumping && !isDucking) {
+            velocityY = JUMP_STRENGTH;
+            isJumping = true;
+        }
+    }
+
+    void duck(bool shouldDuck) {
+        if (!isJumping) {
+            isDucking = shouldDuck;
+        }
+    }
+
+    void moveLeft() {
+        x -= 5;
+        if (x < 20) x = 20;
+        facingDirection = -1;
+    }
+
+    void moveRight() {
+        x += 5;
+        if (x > WINDOW_WIDTH - 100) x = WINDOW_WIDTH - 100;
+        facingDirection = 1;
+    }
+
+    void update(float groundY) {
+        if (isJumping) {
+            if (isDucking) {
+                velocityY += GRAVITY * 4.0f; // Caída más rápida al presionar abajo
+            } else {
+                velocityY += GRAVITY;
+            }
+            y += velocityY;
+
+            if (y >= groundY) {
+                y = groundY;
+                velocityY = 0;
+                isJumping = false;
+            }
+        }
+
+        sprite.setTexture(*walkTexture);
+        sprite.setScale(sf::Vector2f(spriteScale, spriteScale));
+        sf::Vector2u texSize = walkTexture->getSize();
+        int frameWidth = texSize.x / numFrames;
+        
+        // Recortar sprite: usar 60% desde más abajo (eliminar 15% arriba, 25% abajo)
+        int visibleHeight = static_cast<int>(texSize.y * 0.6f);
+        int offsetY = static_cast<int>(texSize.y * 0.15f);
+        
+        // Recortar también los lados si hay espacio extra
+        int visibleWidth = static_cast<int>(frameWidth * 0.8f);
+        int offsetX = static_cast<int>(frameWidth * 0.1f);
+        
+        sprite.setOrigin(sf::Vector2f(visibleWidth / 2.0f, visibleHeight));
+        
+        if (animationClock.getElapsedTime().asSeconds() > 0.12f && !isJumping) {
+            animationFrame = (animationFrame + 1) % numFrames;
+            sprite.setTextureRect(sf::IntRect(sf::Vector2i(animationFrame * frameWidth + offsetX, offsetY), sf::Vector2i(visibleWidth, visibleHeight)));
+            animationClock.restart();
+        }
+        
+        if (facingDirection == -1) {
+            sprite.setScale(sf::Vector2f(-spriteScale, spriteScale));
+        }
+        
+        sprite.setPosition(sf::Vector2f(x, y));
+    }
+
+    bool canShoot() {
+        return shootClock.getElapsedTime().asSeconds() > 0.25f;
+    }
+
+    void resetShootClock() {
+        shootClock.restart();
+    }
+
+    void draw(sf::RenderWindow& window) {
+        window.draw(sprite);
+    }
+
+    sf::FloatRect getBounds() const {
+        sf::FloatRect bounds = sprite.getGlobalBounds();
+        float newWidth = bounds.size.x * 0.6f;
+        float newHeight = bounds.size.y * 0.7f;
+        bounds.position.x += (bounds.size.x - newWidth) / 2.0f;
+        bounds.position.y += (bounds.size.y - newHeight) / 2.0f;
+        bounds.size.x = newWidth;
+        bounds.size.y = newHeight;
+        return bounds;
+    }
+
+    sf::Vector2f getShootPosition() const {
+        sf::FloatRect bounds = sprite.getGlobalBounds();
+        float shootY = y - (bounds.size.y * 0.5f);
+        float shootX = facingDirection == 1 ? x + (bounds.size.x * 0.4f) : x - (bounds.size.x * 0.4f);
+        return sf::Vector2f(shootX, shootY);
+    }
+};
+
+class Explosion {
+public:
+    std::vector<sf::CircleShape> particles;
+    std::vector<sf::Vector2f> velocities;
+    sf::Clock lifetime;
+    bool active;
+
+    Explosion(float x, float y) {
+        active = true;
+        int numParticles = 20;
+        
+        for (int i = 0; i < numParticles; ++i) {
+            sf::CircleShape particle(3);
+            particle.setFillColor(sf::Color(255, 100 + rand() % 156, 0));
+            particle.setPosition(sf::Vector2f(x, y));
+            particles.push_back(particle);
+            
+            float angle = (rand() % 360) * 3.14159f / 180.0f;
+            float speed = 2.0f + (rand() % 3);
+            velocities.push_back(sf::Vector2f(cos(angle) * speed, sin(angle) * speed));
+        }
+    }
+
+    void update() {
+        for (size_t i = 0; i < particles.size(); ++i) {
+            particles[i].move(velocities[i]);
+            velocities[i].y += 0.2f;
+        }
+
+        if (lifetime.getElapsedTime().asSeconds() > 0.5f) {
+            active = false;
+        }
+    }
+
+    void draw(sf::RenderWindow& window) {
+        if (active) {
+            for (auto& particle : particles) {
+                window.draw(particle);
+            }
+        }
+    }
+};
+
+class Enemy {
+public:
+    sf::RectangleShape shape;
+    float x, y;
+    float speed;
+    bool active;
+    int type;
+
+    Enemy(float startX, float groundY, int enemyType) {
+        x = startX;
+        type = 0; // Solo cactus terrestres
+        active = true;
+        speed = 3.0f + (rand() % 3) * 0.5f;
+
+        // Cactus con altura aleatoria entre 60 y 100 píxeles
+        int randomHeight = 60 + (rand() % 41); // 60 a 100
+        int randomWidth = 30 + (rand() % 21);   // 30 a 50
+        
+        shape.setSize(sf::Vector2f(randomWidth, randomHeight));
+        shape.setFillColor(sf::Color(34, 139, 34));
+        y = groundY;
+
+        shape.setPosition(sf::Vector2f(x, y - shape.getSize().y));
+    }
+
+    void update(float speedMultiplier = 1.0f) {
+        x -= speed * speedMultiplier;
+        shape.setPosition(sf::Vector2f(x, y - shape.getSize().y));
+
+        if (x < -100) {
+            active = false;
+        }
+    }
+
+    void draw(sf::RenderWindow& window) {
+        if (active) {
+            window.draw(shape);
+        }
+    }
+
+    sf::FloatRect getBounds() const {
+        return shape.getGlobalBounds();
+    }
+};
+
+// Función para mostrar el menú de selección de personaje
+int showCharacterSelection(sf::RenderWindow& window) {
+    // Cargar personajes
+    CharacterInfo pika, ballesta;
+    
+    pika.name = "PIKA";
+    pika.texturePath = "assets/images/PIKACHU (2) (1).png";
+    pika.numFrames = 4;
+    
+    ballesta.name = "BALLESTA";
+    ballesta.texturePath = "assets/images/Ballesta .png";
+    ballesta.numFrames = 4;
+    
+    if (!pika.texture.loadFromFile(pika.texturePath) || 
+        !ballesta.texture.loadFromFile(ballesta.texturePath)) {
+        return 0; // Error cargando texturas
+    }
+    
+    // Configurar sprites de vista previa
+    sf::Sprite pikaSprite(pika.texture);
+    sf::Sprite ballestaSprite(ballesta.texture);
+    
+    // Configurar escala y posición para Pika (izquierda)
+    sf::Vector2u pikaSize = pika.texture.getSize();
+    int pikaFrameWidth = pikaSize.x / pika.numFrames;
+    pikaSprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(pikaFrameWidth, pikaSize.y)));
+    float pikaScale = 250.0f / pikaSize.y;
+    pikaSprite.setScale(sf::Vector2f(pikaScale, pikaScale));
+    pikaSprite.setPosition(sf::Vector2f(200, 250));
+    
+    // Configurar escala y posición para Ballesta (derecha)
+    sf::Vector2u ballestaSize = ballesta.texture.getSize();
+    int ballestaFrameWidth = ballestaSize.x / ballesta.numFrames;
+    ballestaSprite.setTextureRect(sf::IntRect(sf::Vector2i(0, 0), sf::Vector2i(ballestaFrameWidth, ballestaSize.y)));
+    float ballestaScale = 250.0f / ballestaSize.y;
+    ballestaSprite.setScale(sf::Vector2f(ballestaScale, ballestaScale));
+    ballestaSprite.setPosition(sf::Vector2f(600, 250));
+    
+    // Cargar fuente
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return 0;
+    }
+    
+    // Textos
+    sf::Text titleText(font);
+    titleText.setString("SELECCIONA TU PERSONAJE");
+    titleText.setCharacterSize(40);
+    titleText.setFillColor(sf::Color::White);
+    titleText.setPosition(sf::Vector2f(250, 50));
+    
+    sf::Text pikaText(font);
+    pikaText.setString("PIKA");
+    pikaText.setCharacterSize(30);
+    pikaText.setFillColor(sf::Color::White);
+    pikaText.setPosition(sf::Vector2f(210, 450));
+    
+    sf::Text ballestaText(font);
+    ballestaText.setString("BALLESTA");
+    ballestaText.setCharacterSize(30);
+    ballestaText.setFillColor(sf::Color::White);
+    ballestaText.setPosition(sf::Vector2f(580, 450));
+    
+    sf::Text instructionText(font);
+    instructionText.setString("Presiona 1 para PIKA o 2 para BALLESTA");
+    instructionText.setCharacterSize(20);
+    instructionText.setFillColor(sf::Color(200, 200, 200));
+    instructionText.setPosition(sf::Vector2f(280, 520));
+    
+    // Indicadores de selección (marcos)
+    sf::RectangleShape pikaFrame(sf::Vector2f(pikaFrameWidth * pikaScale + 20, pikaSize.y * pikaScale + 20));
+    pikaFrame.setFillColor(sf::Color::Transparent);
+    pikaFrame.setOutlineColor(sf::Color::Yellow);
+    pikaFrame.setOutlineThickness(5);
+    pikaFrame.setPosition(sf::Vector2f(190, 240));
+    
+    sf::RectangleShape ballestaFrame(sf::Vector2f(ballestaFrameWidth * ballestaScale + 20, ballestaSize.y * ballestaScale + 20));
+    ballestaFrame.setFillColor(sf::Color::Transparent);
+    ballestaFrame.setOutlineColor(sf::Color::Yellow);
+    ballestaFrame.setOutlineThickness(5);
+    ballestaFrame.setPosition(sf::Vector2f(590, 240));
+    
+    int selectedCharacter = -1;
+    int hoveredCharacter = 0; // 0 = pika, 1 = ballesta
+    
+    sf::Clock animClock;
+    int animFrame = 0;
+    
+    while (window.isOpen() && selectedCharacter == -1) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                return -1;
+            }
+            
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Num1 || keyPressed->code == sf::Keyboard::Key::Numpad1) {
+                    selectedCharacter = 0; // Pika
+                } else if (keyPressed->code == sf::Keyboard::Key::Num2 || keyPressed->code == sf::Keyboard::Key::Numpad2) {
+                    selectedCharacter = 1; // Ballesta
+                } else if (keyPressed->code == sf::Keyboard::Key::Left) {
+                    hoveredCharacter = 0;
+                } else if (keyPressed->code == sf::Keyboard::Key::Right) {
+                    hoveredCharacter = 1;
+                } else if (keyPressed->code == sf::Keyboard::Key::Enter) {
+                    selectedCharacter = hoveredCharacter;
+                }
+            }
+        }
+        
+        // Animación de sprites
+        if (animClock.getElapsedTime().asSeconds() > 0.15f) {
+            animFrame = (animFrame + 1) % 4;
+            pikaSprite.setTextureRect(sf::IntRect(sf::Vector2i(animFrame * pikaFrameWidth, 0), sf::Vector2i(pikaFrameWidth, pikaSize.y)));
+            ballestaSprite.setTextureRect(sf::IntRect(sf::Vector2i(animFrame * ballestaFrameWidth, 0), sf::Vector2i(ballestaFrameWidth, ballestaSize.y)));
+            animClock.restart();
+        }
+        
+        // Dibujar
+        window.clear(sf::Color(20, 20, 40));
+        
+        // Dibujar marcos de selección
+        if (hoveredCharacter == 0) {
+            window.draw(pikaFrame);
+        } else {
+            window.draw(ballestaFrame);
+        }
+        
+        // Dibujar sprites
+        window.draw(pikaSprite);
+        window.draw(ballestaSprite);
+        
+        // Dibujar textos
+        window.draw(titleText);
+        window.draw(pikaText);
+        window.draw(ballestaText);
+        window.draw(instructionText);
+        
+        window.display();
+    }
+    
+    return selectedCharacter;
+}
+
+int main() {
+    srand(static_cast<unsigned>(time(0)));
+
+    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Dino Revenge - Seleccion de Personaje");
+    window.setFramerateLimit(60);
+
+    // Mostrar menú de selección
+    int selectedCharacter = showCharacterSelection(window);
+    
+    if (selectedCharacter == -1) {
+        return 0; // Ventana cerrada durante la selección
+    }
+    
+    // Cargar textura del personaje seleccionado
+    sf::Texture characterTexture;
+    int numFrames = 4;
+    
+    if (selectedCharacter == 0) {
+        if (!characterTexture.loadFromFile("assets/images/PIKACHU (2) (1).png")) {
+            return -1;
+        }
+    } else {
+        if (!characterTexture.loadFromFile("assets/images/Ballesta .png")) {
+            return -1;
+        }
+    }
+
+    // Calcular posición del suelo - personajes tocan el borde del suelo
+    float groundY = WINDOW_HEIGHT - GROUND_HEIGHT;
+    
+    // Ajustar posición del personaje más abajo
+    float playerGroundY = groundY + 70;
+
+    // Crear personaje con la textura seleccionada
+    Dino dino(100, playerGroundY, &characterTexture, numFrames);
+
+    // Cargar fondo
+    sf::Texture backgroundTexture;
+    if (!backgroundTexture.loadFromFile("assets/images/fondo.png")) {
+        return -1;
+    }
+    sf::Sprite background1(backgroundTexture);
+    sf::Sprite background2(backgroundTexture);
+    
+    // Escalar el fondo para que abarque toda la altura de la ventana
+    sf::Vector2u bgSize = backgroundTexture.getSize();
+    float scaleY = static_cast<float>(WINDOW_HEIGHT) / bgSize.y;
+    float scaleX = scaleY; // Mantener proporción
+    background1.setScale(sf::Vector2f(scaleX, scaleY));
+    background2.setScale(sf::Vector2f(scaleX, scaleY));
+    
+    // Posicionar el segundo fondo para scroll continuo
+    background2.setPosition(sf::Vector2f(bgSize.x * scaleX, 0));
+    float backgroundSpeed = 2.0f;
+    float gameSpeedMultiplier = 1.0f;
+
+    // Suelo
+    sf::RectangleShape ground(sf::Vector2f(WINDOW_WIDTH, GROUND_HEIGHT));
+    ground.setPosition(sf::Vector2f(0, WINDOW_HEIGHT - GROUND_HEIGHT));
+    ground.setFillColor(sf::Color(139, 90, 43));
+
+    std::vector<Enemy> enemies;
+    std::vector<Projectile> projectiles;
+    std::vector<Explosion> explosions;
+
+    sf::Clock enemySpawnClock;
+    float spawnInterval = 2.0f;
+
+    int score = 0;
+    int lives = 3;
+
+    sf::Font font;
+    if (!font.openFromFile("assets/fonts/Minecraft.ttf")) {
+        return -1;
+    }
+
+    sf::Text scoreText(font);
+    scoreText.setString("Score: 0");
+    scoreText.setCharacterSize(24);
+    scoreText.setPosition(sf::Vector2f(10, 10));
+    scoreText.setFillColor(sf::Color::White);
+
+    sf::Text livesText(font);
+    livesText.setString("Lives: 3");
+    livesText.setCharacterSize(24);
+    livesText.setPosition(sf::Vector2f(10, 40));
+    livesText.setFillColor(sf::Color::Red);
+
+    bool gameOver = false;
+    sf::Text gameOverText(font);
+    gameOverText.setString("GAME OVER - Presiona R para Reiniciar");
+    gameOverText.setCharacterSize(30);
+    gameOverText.setPosition(sf::Vector2f(200, WINDOW_HEIGHT / 2));
+    gameOverText.setFillColor(sf::Color::Red);
+
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+            }
+
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Space && !gameOver) {
+                    dino.jump();
+                }
+                if (keyPressed->code == sf::Keyboard::Key::R && gameOver) {
+                    // Reiniciar juego - volver a mostrar selección
+                    selectedCharacter = showCharacterSelection(window);
+                    if (selectedCharacter == -1) {
+                        window.close();
+                        return 0;
+                    }
+                    
+                    // Recargar textura seleccionada
+                    if (selectedCharacter == 0) {
+                        characterTexture.loadFromFile("assets/images/PIKACHU (2) (1).png");
+                    } else {
+                        characterTexture.loadFromFile("assets/images/Ballesta .png");
+                    }
+                    
+                    dino = Dino(100, playerGroundY, &characterTexture, numFrames);
+                    enemies.clear();
+                    projectiles.clear();
+                    explosions.clear();
+                    score = 0;
+                    lives = 3;
+                    gameOver = false;
+                    enemySpawnClock.restart();
+                }
+            }
+        }
+
+        if (!gameOver) {
+            // Controles
+            bool isDuckingPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
+            dino.duck(isDuckingPressed);
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
+                dino.moveLeft();
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
+                dino.moveRight();
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::X) && dino.canShoot()) {
+                sf::Vector2f shootPos = dino.getShootPosition();
+                projectiles.push_back(Projectile(shootPos.x, shootPos.y, dino.facingDirection));
+                dino.resetShootClock();
+            }
+
+            // Actualizar personaje con su posición de suelo ajustada
+            dino.update(playerGroundY);
+            
+            // Aumentar velocidad del juego con el tiempo (cada 20 puntos)
+            if (score > 0 && score % 20 == 0 && gameSpeedMultiplier < 2.0f) {
+                gameSpeedMultiplier = 1.0f + (score / 100.0f);
+            }
+
+            // Mover fondo con velocidad aumentada
+            background1.move(sf::Vector2f(-backgroundSpeed * gameSpeedMultiplier, 0));
+            background2.move(sf::Vector2f(-backgroundSpeed * gameSpeedMultiplier, 0));
+            
+            // Usar el ancho escalado del fondo para el scroll
+            float scaledBgWidth = backgroundTexture.getSize().x * background1.getScale().x;
+            if (background1.getPosition().x <= -scaledBgWidth) {
+                background1.setPosition(sf::Vector2f(background2.getPosition().x + scaledBgWidth, 0));
+            }
+            if (background2.getPosition().x <= -scaledBgWidth) {
+                background2.setPosition(sf::Vector2f(background1.getPosition().x + scaledBgWidth, 0));
+            }
+
+            // Spawn enemigos - solo cactus terrestres con aparición más rápida
+            if (enemySpawnClock.getElapsedTime().asSeconds() > (spawnInterval / gameSpeedMultiplier)) {
+                enemies.push_back(Enemy(WINDOW_WIDTH, groundY, 0));
+                enemySpawnClock.restart();
+                
+                if (score > 0 && score % 10 == 0 && spawnInterval > 1.0f) {
+                    spawnInterval -= 0.05f; // Reducción más gradual
+                }
+            }
+
+            // Actualizar enemigos con velocidad aumentada
+            for (auto& enemy : enemies) {
+                enemy.update(gameSpeedMultiplier);
+            }
+
+            // Actualizar proyectiles
+            for (auto& projectile : projectiles) {
+                projectile.update();
+            }
+
+            // Actualizar explosiones
+            for (auto& explosion : explosions) {
+                explosion.update();
+            }
+
+            // Colisiones proyectiles-enemigos
+            for (auto& projectile : projectiles) {
+                for (auto& enemy : enemies) {
+                    if (projectile.active && enemy.active && 
+                        projectile.getBounds().findIntersection(enemy.getBounds()).has_value()) {
+                        projectile.active = false;
+                        enemy.active = false;
+                        score += 10;
+                        explosions.push_back(Explosion(enemy.x, enemy.y - 25));
+                    }
+                }
+            }
+
+            // Colisiones dino-enemigos
+            for (auto& enemy : enemies) {
+                if (enemy.active && dino.getBounds().findIntersection(enemy.getBounds()).has_value()) {
+                    enemy.active = false;
+                    lives--;
+                    if (lives <= 0) {
+                        gameOver = true;
+                    }
+                }
+            }
+
+            // Limpiar objetos inactivos
+            enemies.erase(std::remove_if(enemies.begin(), enemies.end(),
+                [](const Enemy& e) { return !e.active; }), enemies.end());
+            projectiles.erase(std::remove_if(projectiles.begin(), projectiles.end(),
+                [](const Projectile& p) { return !p.active; }), projectiles.end());
+            explosions.erase(std::remove_if(explosions.begin(), explosions.end(),
+                [](const Explosion& e) { return !e.active; }), explosions.end());
+
+            // Actualizar textos
+            scoreText.setString("Score: " + std::to_string(score));
+            livesText.setString("Lives: " + std::to_string(lives));
+        }
+
+        // Dibujar
+        window.clear(sf::Color(135, 206, 235));
+        
+        window.draw(background1);
+        window.draw(background2);
+        window.draw(ground);
+        
+        dino.draw(window);
+        
+        for (auto& enemy : enemies) {
+            enemy.draw(window);
+        }
+        
+        for (auto& projectile : projectiles) {
+            projectile.draw(window);
+        }
+        
+        for (auto& explosion : explosions) {
+            explosion.draw(window);
+        }
+        
+        window.draw(scoreText);
+        window.draw(livesText);
+        
+        if (gameOver) {
+            window.draw(gameOverText);
+        }
+        
+        window.display();
+    }
+
+    return 0;
+}
