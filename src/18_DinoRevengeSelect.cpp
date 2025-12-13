@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <vector>
 #include <cstdlib>
 #include <ctime>
@@ -342,6 +343,14 @@ public:
 
 // Función para mostrar el menú de selección de personaje
 int showCharacterSelection(sf::RenderWindow& window) {
+    // Cargar y reproducir música de selección
+    sf::Music selectionMusic;
+    if (!selectionMusic.openFromFile("assets/music/Selecciona-tu-personaje.ogg")) {
+        return 0; // Error cargando música
+    }
+    selectionMusic.setLooping(true);
+    selectionMusic.play();
+    
     // Cargar fondo principal
     sf::Texture backgroundTexture;
     if (!backgroundTexture.loadFromFile("assets/images/Fondo principal.png")) {
@@ -513,6 +522,9 @@ int showCharacterSelection(sf::RenderWindow& window) {
         window.display();
     }
     
+    // Detener la música de selección al salir del menú
+    selectionMusic.stop();
+    
     return selectedCharacter;
 }
 
@@ -588,6 +600,19 @@ int main() {
     float backgroundSpeed = 2.0f;
     float gameSpeedMultiplier = 1.0f;
 
+    // Cargar músicas del juego
+    sf::Music gameMusic1, gameMusic2;
+    if (!gameMusic1.openFromFile("assets/music/Jugar1.ogg")) {
+        return -1;
+    }
+    if (!gameMusic2.openFromFile("assets/music/Jugar2.ogg")) {
+        return -1;
+    }
+    
+    // Reproducir la primera música del juego
+    gameMusic1.play();
+    int currentMusic = 1; // 1 = Jugar1, 2 = Jugar2
+
     // Suelo
     sf::RectangleShape ground(sf::Vector2f(WINDOW_WIDTH, GROUND_HEIGHT));
     ground.setPosition(sf::Vector2f(0, WINDOW_HEIGHT - GROUND_HEIGHT));
@@ -653,6 +678,10 @@ int main() {
                     dino.jump();
                 }
                 if (keyPressed->code == sf::Keyboard::Key::R && gameOver) {
+                    // Detener músicas del juego
+                    gameMusic1.stop();
+                    gameMusic2.stop();
+                    
                     // Reiniciar juego - volver a mostrar selección
                     selectedCharacter = showCharacterSelection(window);
                     if (selectedCharacter == -1) {
@@ -678,8 +707,23 @@ int main() {
                     lastEnemyType = -1;
                     consecutiveTrucks = 0;
                     spawnInterval = 2.0f;
+                    
+                    // Reiniciar música del juego
+                    gameMusic1.stop();
+                    gameMusic2.stop();
+                    gameMusic1.play();
+                    currentMusic = 1;
                 }
             }
+        }
+        
+        // Alternar entre las músicas del juego cuando una termina
+        if (currentMusic == 1 && gameMusic1.getStatus() != sf::Music::Status::Playing) {
+            gameMusic2.play();
+            currentMusic = 2;
+        } else if (currentMusic == 2 && gameMusic2.getStatus() != sf::Music::Status::Playing) {
+            gameMusic1.play();
+            currentMusic = 1;
         }
 
         if (!gameOver) {
